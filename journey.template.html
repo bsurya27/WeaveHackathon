@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advisor Journey</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --specialist: #3b82f6;
+      --decider: #f59e0b;
+      --structural: #64748b;
+      --agree: #22c55e;
+      --pushback: #ef4444;
+      --edge: #475569;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 1fr min(420px, 38vw);
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      gap: 0;
+    }
+    header {
+      grid-column: 1 / -1;
+      padding: 16px 24px;
+      background: var(--panel);
+      border-bottom: 1px solid #334155;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .session-id { color: var(--muted); font-size: 0.9rem; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    button, .file-btn {
+      background: #334155;
+      color: var(--text);
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover, .file-btn:hover { background: #475569; }
+    button.primary { background: var(--specialist); }
+    button.primary:hover { background: #2563eb; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .file-btn { display: inline-block; position: relative; overflow: hidden; }
+    .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .readout {
+      padding: 12px 24px;
+      background: #172554;
+      border-bottom: 1px solid #334155;
+      grid-column: 1 / -1;
+      font-size: 1.05rem;
+      line-height: 1.5;
+    }
+    .readout strong { color: #93c5fd; font-size: 1.25rem; }
+    .graph-wrap {
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .graph-wrap svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .side-panel {
+      background: var(--panel);
+      border-left: 1px solid #334155;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .side-panel h2 {
+      font-size: 1.15rem;
+      margin-bottom: 4px;
+      text-transform: capitalize;
+    }
+    .side-panel .subtitle {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+    }
+    .panel-item {
+      background: #0f172a;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      border-left: 4px solid var(--specialist);
+    }
+    .panel-item.decider { border-left-color: var(--decider); }
+    .panel-item.agree { border-left-color: var(--agree); }
+    .panel-item.pushback { border-left-color: var(--pushback); }
+    .panel-item h3 { font-size: 0.95rem; margin-bottom: 6px; }
+    .panel-item p { font-size: 0.88rem; line-height: 1.45; color: #cbd5e1; }
+    .confidence {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .confidence-bar {
+      flex: 1;
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .confidence-fill {
+      height: 100%;
+      background: var(--decider);
+      border-radius: 3px;
+    }
+    .legend {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(30, 41, 59, 0.92);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      line-height: 1.8;
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .legend-line {
+      display: inline-block;
+      width: 20px;
+      height: 3px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .stage-label {
+      font-size: 0.75rem;
+      fill: var(--muted);
+      text-anchor: middle;
+    }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; }
+      .side-panel { border-left: none; border-top: 1px solid #334155; max-height: 40vh; }
+      .graph-wrap { min-height: 55vh; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const SESSION = __SESSION_JSON__;
+  </script>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+    const STAGE_NAMES = [
+      "Pitch deck",
+      "Specialists (parallel)",
+      "Deciders — round 1",
+      "Deciders — cross-exam",
+      "Synthesis",
+      "Final brief",
+    ];
+
+    function fmtRole(role) {
+      return String(role).replace(/_/g, " ");
+    }
+
+    function rowPositions(count, cx, y, spacing) {
+      if (count === 0) return [];
+      const total = spacing * (count - 1);
+      const start = cx - total / 2;
+      return Array.from({ length: count }, (_, i) => ({
+        x: start + i * spacing,
+        y,
+      }));
+    }
+
+    function polyPositions(count, cx, cy, radius) {
+      if (count === 0) return [];
+      if (count === 1) return [{ x: cx, y: cy }];
+      if (count === 2) {
+        return [
+          { x: cx - radius, y: cy },
+          { x: cx + radius, y: cy },
+        ];
+      }
+      return Array.from({ length: count }, (_, i) => {
+        const angle = -Math.PI / 2 + (i * 2 * Math.PI) / count;
+        return {
+          x: cx + radius * Math.cos(angle),
+          y: cy + radius * Math.sin(angle) * 0.55,
+        };
+      });
+    }
+
+    function edgePath(x1, y1, x2, y2, curve = 0.25) {
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2 - Math.abs(x2 - x1) * curve;
+      return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
+    }
+
+    function computeStats(session) {
+      const specialists = session.specialist_reports || [];
+      const deciders1 = session.decider_stage1 || [];
+      const brief = session.final_brief || {};
+      const specFindings = specialists.reduce(
+        (n, r) => n + (r.focus_items?.length || 0),
+        0
+      );
+      const decFindings = deciders1.reduce(
+        (n, d) => n + (d.key_findings?.length || 0),
+        0
+      );
+      return {
+        totalFindings: specFindings + decFindings,
+        agentCount: specialists.length + deciders1.length,
+        focusCount: brief.focus_list?.length || 0,
+        disagreeCount: brief.advisor_disagreements?.length || 0,
+      };
+    }
+
+    function buildGraph(session, w, h) {
+      const cx = w / 2;
+      const specRoles = (session.specialist_reports || []).map((r) => r.role);
+      const decRoles = (session.decider_stage1 || []).map((d) => d.role);
+      const spacing = Math.min(140, (w - 120) / Math.max(specRoles.length, 1));
+
+      const nodes = [];
+      const edges = [];
+
+      const pitch = { id: "pitch_deck", kind: "pitch", role: "pitch deck", x: cx, y: 70, r: 44 };
+      nodes.push(pitch);
+
+      const specPos = rowPositions(specRoles.length, cx, 200, spacing);
+      specRoles.forEach((role, i) => {
+        nodes.push({
+          id: `specialist:${role}`,
+          kind: "specialist",
+          role,
+          x: specPos[i].x,
+          y: specPos[i].y,
+          r: 38,
+        });
+        edges.push({
+          id: `e-pitch-${role}`,
+          kind: "fanout",
+          from: pitch.id,
+          to: `specialist:${role}`,
+          stage: 1,
+        });
+      });
+
+      const dec1Pos = rowPositions(decRoles.length, cx, 340, spacing);
+      decRoles.forEach((role, i) => {
+        nodes.push({
+          id: `decider1:${role}`,
+          kind: "decider1",
+          role,
+          x: dec1Pos[i].x,
+          y: dec1Pos[i].y,
+          r: 38,
+        });
+        specRoles.forEach((srole) => {
+          edges.push({
+            id: `e-spec-${srole}-d1-${role}`,
+            kind: "bundle",
+            from: `specialist:${srole}`,
+            to: `decider1:${role}`,
+            stage: 2,
+          });
+        });
+      });
+
+      const triR = Math.min(120, w * 0.14);
+      const dec2Pos = polyPositions(decRoles.length, cx, 500, triR);
+      decRoles.forEach((role, i) => {
+        nodes.push({
+          id: `decider2:${role}`,
+          kind: "decider2",
+          role,
+          x: dec2Pos[i].x,
+          y: dec2Pos[i].y,
+          r: 38,
+        });
+        edges.push({
+          id: `e-d1-d2-${role}`,
+          kind: "flow",
+          from: `decider1:${role}`,
+          to: `decider2:${role}`,
+          stage: 3,
+        });
+      });
+
+      const stage2Map = {};
+      (session.decider_stage2 || []).forEach((r) => {
+        stage2Map[r.role] = r;
+      });
+
+      decRoles.forEach((sourceRole) => {
+        const reaction = stage2Map[sourceRole];
+        if (!reaction) return;
+        (reaction.reacting_to || []).forEach((peerRole) => {
+          const hasPush = (reaction.pushbacks || []).length > 0;
+          const hasAgree = (reaction.agreements || []).length > 0;
+          let tone = "neutral";
+          if (hasPush) tone = "pushback";
+          else if (hasAgree) tone = "agreement";
+          edges.push({
+            id: `e-x-${sourceRole}-${peerRole}`,
+            kind: "cross",
+            from: `decider2:${sourceRole}`,
+            to: `decider2:${peerRole}`,
+            stage: 3,
+            tone,
+            agreements: reaction.agreements || [],
+            pushbacks: reaction.pushbacks || [],
+            sourceRole,
+            peerRole,
+          });
+        });
+      });
+
+      const synth = { id: "synthesis", kind: "synthesis", role: "synthesis", x: cx, y: 640, r: 44 };
+      nodes.push(synth);
+      decRoles.forEach((role) => {
+        edges.push({
+          id: `e-d2-synth-${role}`,
+          kind: "fanin",
+          from: `decider2:${role}`,
+          to: synth.id,
+          stage: 4,
+        });
+      });
+
+      const brief = { id: "final_brief", kind: "brief", role: "final brief", x: cx, y: 760, r: 44 };
+      nodes.push(brief);
+      edges.push({
+        id: "e-synth-brief",
+        kind: "flow",
+        from: synth.id,
+        to: brief.id,
+        stage: 5,
+      });
+
+      return { nodes, edges, specRoles, decRoles };
+    }
+
+    function useCountUp(target, active, duration = 1200) {
+      const [val, setVal] = useState(0);
+      const reduced = useRef(
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      );
+      useEffect(() => {
+        if (!active) {
+          setVal(0);
+          return;
+        }
+        if (reduced.current) {
+          setVal(target);
+          return;
+        }
+        const start = performance.now();
+        let frame;
+        const tick = (now) => {
+          const t = Math.min(1, (now - start) / duration);
+          setVal(Math.round(target * (1 - Math.pow(1 - t, 3))));
+          if (t < 1) frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+      }, [target, active, duration]);
+      return val;
+    }
+
+    function Panel({ selection, session }) {
+      if (!selection) {
+        return (
+          <div>
+            <h2>Advisor journey</h2>
+            <p className="subtitle">Click a node or decider edge to inspect real panel output.</p>
+            {session.final_brief?.how_constructed && (
+              <div className="panel-item">
+                <h3>How this brief was built</h3>
+                <p>{session.final_brief.how_constructed}</p>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      if (selection.type === "edge") {
+        const { edge } = selection;
+        return (
+          <div>
+            <h2>{fmtRole(edge.sourceRole)} → {fmtRole(edge.peerRole)}</h2>
+            <p className="subtitle">Stage-2 cross-examination</p>
+            {(edge.agreements || []).map((a, i) => (
+              <div key={`a-${i}`} className="panel-item agree">
+                <h3>Agreement</h3>
+                <p><strong>{a.point}</strong></p>
+                <p>{a.why}</p>
+              </div>
+            ))}
+            {(edge.pushbacks || []).length === 0 && (edge.agreements || []).length === 0 && (
+              <div className="panel-item"><p>No agreements or pushbacks recorded for this direction.</p></div>
+            )}
+            {(edge.pushbacks || []).map((p, i) => (
+              <div key={`p-${i}`} className="panel-item pushback">
+                <h3>Pushback</h3>
+                <p><strong>{p.point}</strong></p>
+                <p>{p.counter}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      const { node } = selection;
+      const role = node.role;
+
+      if (node.kind === "specialist") {
+        const report = (session.specialist_reports || []).find((r) => r.role === role);
+        return (
+          <div>
+            <h2>{fmtRole(role)}</h2>
+            <p className="subtitle">Specialist report — focus items</p>
+            {(report?.focus_items || []).map((item, i) => (
+              <div key={i} className="panel-item">
+                <h3>{item.title}</h3>
+                <p>{item.action}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (node.kind === "decider1" || node.kind === "decider2") {
+        const persp = (session.decider_stage1 || []).find((d) => d.role === role);
+        return (
+          <div>
+            <h2>{fmtRole(role)}</h2>
+            <p className="subtitle">Decider — key findings</p>
+            {(persp?.key_findings || []).map((f, i) => (
+              <div key={i} className="panel-item decider">
+                <h3>{f.finding}</h3>
+                <p style={{ fontSize: "0.8rem", marginTop: 6 }}>{f.citation}</p>
+                <div className="confidence">
+                  <span>{f.confidence}/10</span>
+                  <div className="confidence-bar">
+                    <div className="confidence-fill" style={{ width: `${f.confidence * 10}%` }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (node.kind === "synthesis" || node.kind === "brief") {
+        const brief = session.final_brief || {};
+        return (
+          <div>
+            <h2>{node.kind === "brief" ? "Final brief" : "Synthesis"}</h2>
+            <p className="subtitle">Consolidated focus list{node.kind === "brief" ? " + open questions" : ""}</p>
+            {(brief.focus_list || []).map((item, i) => (
+              <div key={i} className="panel-item">
+                <h3>{i + 1}. {item.title}</h3>
+                <p>{item.action}</p>
+                {item.rationale && <p style={{ marginTop: 8, fontSize: "0.82rem", color: "#94a3b8" }}>{item.rationale}</p>}
+              </div>
+            ))}
+            {node.kind === "brief" && (brief.open_questions_for_founder || []).map((q, i) => (
+              <div key={`q-${i}`} className="panel-item decider">
+                <h3>Open question</h3>
+                <p>{q}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (node.kind === "pitch") {
+        const deck = session.pitch_deck || {};
+        return (
+          <div>
+            <h2>Pitch deck</h2>
+            <p className="subtitle">Input to the panel</p>
+            {Object.entries(deck).map(([k, v]) => (
+              <div key={k} className="panel-item">
+                <h3>{k.replace(/_/g, " ")}</h3>
+                <p>{Array.isArray(v) ? v.join("; ") : v}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      return null;
+    }
+
+    function nodeColor(kind) {
+      if (kind === "specialist") return "var(--specialist)";
+      if (kind.startsWith("decider")) return "var(--decider)";
+      return "var(--structural)";
+    }
+
+    function App() {
+      const [session, setSession] = useState(SESSION);
+      const [stageIndex, setStageIndex] = useState(0);
+      const [playing, setPlaying] = useState(false);
+      const [selection, setSelection] = useState(null);
+      const [size, setSize] = useState({ w: 960, h: 820 });
+      const wrapRef = useRef(null);
+
+      useEffect(() => {
+        const ro = new ResizeObserver((entries) => {
+          const { width, height } = entries[0].contentRect;
+          setSize({ w: Math.max(600, width), h: Math.max(700, height) });
+        });
+        if (wrapRef.current) ro.observe(wrapRef.current);
+        return () => ro.disconnect();
+      }, []);
+
+      useEffect(() => {
+        if (!playing) return;
+        const id = setInterval(() => {
+          setStageIndex((s) => {
+            if (s >= STAGE_NAMES.length - 1) {
+              setPlaying(false);
+              return s;
+            }
+            return s + 1;
+          });
+        }, 1800);
+        return () => clearInterval(id);
+      }, [playing]);
+
+      const graph = useMemo(() => buildGraph(session, size.w, size.h), [session, size]);
+      const stats = useMemo(() => computeStats(session), [session]);
+      const showReadout = stageIndex >= STAGE_NAMES.length - 1;
+      const animFindings = useCountUp(stats.totalFindings, showReadout);
+      const animFocus = useCountUp(stats.focusCount, showReadout);
+      const animDisagree = useCountUp(stats.disagreeCount, showReadout);
+
+      const nodeVisible = (node) => {
+        if (node.kind === "pitch") return stageIndex >= 0;
+        if (node.kind === "specialist") return stageIndex >= 1;
+        if (node.kind === "decider1") return stageIndex >= 2;
+        if (node.kind === "decider2") return stageIndex >= 3;
+        if (node.kind === "synthesis") return stageIndex >= 4;
+        if (node.kind === "brief") return stageIndex >= 5;
+        return false;
+      };
+
+      const edgeVisible = (edge) => edge.stage <= stageIndex;
+
+      const edgeStroke = (edge) => {
+        if (edge.kind === "cross") {
+          if (edge.tone === "agreement") return "var(--agree)";
+          if (edge.tone === "pushback") return "var(--pushback)";
+          return "var(--edge)";
+        }
+        return "var(--edge)";
+      };
+
+      const loadFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            setSession(JSON.parse(ev.target.result));
+            setStageIndex(0);
+            setSelection(null);
+            setPlaying(false);
+          } catch {
+            alert("Invalid session JSON");
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      return (
+        <div className="app">
+          <header>
+            <div>
+              <h1>Multi-Agent Advisor Journey</h1>
+              <div className="session-id">session: {session.session_id || "—"}</div>
+            </div>
+            <div className="controls">
+              <button className="primary" onClick={() => { setStageIndex(0); setPlaying(true); }}>
+                ▶ Play
+              </button>
+              <button disabled={stageIndex <= 0} onClick={() => setStageIndex((s) => s - 1)}>◀</button>
+              <button disabled={stageIndex >= STAGE_NAMES.length - 1} onClick={() => setStageIndex((s) => s + 1)}>▶</button>
+              <button onClick={() => { setStageIndex(0); setPlaying(false); }}>↺ Replay</button>
+              <label className="file-btn">
+                Load session…
+                <input type="file" accept=".json,application/json" onChange={loadFile} />
+              </label>
+            </div>
+          </header>
+
+          <div className="readout">
+            Stage {stageIndex + 1}/{STAGE_NAMES.length}: <strong>{STAGE_NAMES[stageIndex]}</strong>
+            {showReadout && (
+              <span style={{ marginLeft: 16 }}>
+                {" "}
+                <strong>{animFindings}</strong> findings across <strong>{stats.agentCount}</strong> agents →{" "}
+                <strong>{animFocus}</strong> focus items, <strong>{animDisagree}</strong> disagreements kept
+              </span>
+            )}
+          </div>
+
+          <div className="graph-wrap" ref={wrapRef}>
+            <svg viewBox={`0 0 ${size.w} ${size.h}`} preserveAspectRatio="xMidYMid meet">
+              {graph.edges.filter(edgeVisible).map((edge) => {
+                const from = graph.nodes.find((n) => n.id === edge.from);
+                const to = graph.nodes.find((n) => n.id === edge.to);
+                if (!from || !to || !nodeVisible(from) || !nodeVisible(to)) return null;
+                const path = edgePath(from.x, from.y, to.x, to.y, edge.kind === "cross" ? 0.15 : 0.2);
+                const isCross = edge.kind === "cross";
+                return (
+                  <g key={edge.id}>
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={edgeStroke(edge)}
+                      strokeWidth={isCross ? 3 : 1.5}
+                      strokeOpacity={isCross ? 0.95 : 0.35}
+                      strokeDasharray={edge.kind === "bundle" ? "4 4" : undefined}
+                      style={{
+                        cursor: isCross ? "pointer" : "default",
+                        transition: reducedMotion ? "none" : "stroke-opacity 0.5s",
+                      }}
+                      onClick={() => isCross && setSelection({ type: "edge", edge })}
+                      onMouseEnter={() => isCross && setSelection({ type: "edge", edge })}
+                    />
+                    {isCross && (
+                      <path
+                        d={path}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={14}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => setSelection({ type: "edge", edge })}
+                        onMouseEnter={() => setSelection({ type: "edge", edge })}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+
+              {graph.nodes.map((node) => {
+                const vis = nodeVisible(node);
+                const opacity = vis ? 1 : 0;
+                const scale = vis ? 1 : 0.6;
+                return (
+                  <g
+                    key={node.id}
+                    transform={`translate(${node.x}, ${node.y}) scale(${scale})`}
+                    style={{
+                      opacity,
+                      transition: reducedMotion ? "none" : "opacity 0.55s ease, transform 0.55s ease",
+                      cursor: vis ? "pointer" : "default",
+                    }}
+                    onClick={() => vis && setSelection({ type: "node", node })}
+                    onMouseEnter={() => vis && setSelection({ type: "node", node })}
+                  >
+                    <circle
+                      r={node.r}
+                      fill={nodeColor(node.kind)}
+                      stroke="#f8fafc"
+                      strokeWidth={selection?.type === "node" && selection.node.id === node.id ? 3 : 1}
+                    />
+                    <text
+                      textAnchor="middle"
+                      dy="0.35em"
+                      fill="#fff"
+                      fontSize={node.r > 40 ? 11 : 10}
+                      fontWeight="700"
+                      style={{ pointerEvents: "none", textTransform: "capitalize" }}
+                    >
+                      {fmtRole(node.role).length > 14
+                        ? fmtRole(node.role).slice(0, 12) + "…"
+                        : fmtRole(node.role)}
+                    </text>
+                  </g>
+                );
+              })}
+
+              <text className="stage-label" x={size.w / 2} y={145}>Specialists</text>
+              <text className="stage-label" x={size.w / 2} y={285}>Deciders — round 1</text>
+              <text className="stage-label" x={size.w / 2} y={445}>Deciders — cross-exam</text>
+            </svg>
+
+            <div className="legend">
+              <div><span className="legend-dot" style={{ background: "var(--specialist)" }} /> Specialist</div>
+              <div><span className="legend-dot" style={{ background: "var(--decider)" }} /> Decider</div>
+              <div><span className="legend-dot" style={{ background: "var(--structural)" }} /> Pipeline</div>
+              <div><span className="legend-line" style={{ background: "var(--agree)" }} /> Agreement</div>
+              <div><span className="legend-line" style={{ background: "var(--pushback)" }} /> Pushback</div>
+            </div>
+          </div>
+
+          <aside className="side-panel">
+            <Panel selection={selection} session={session} />
+          </aside>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

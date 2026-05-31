@@ -12,6 +12,8 @@ from prompts import (
     DECIDER_STAGE2_USER_TEMPLATE,
     SPECIALIST_SYSTEM_PROMPTS,
     SPECIALIST_USER_TEMPLATE,
+    SYNTHESIS_SYSTEM,
+    SYNTHESIS_USER_TEMPLATE,
 )
 from schemas import (
     DeciderPerspective,
@@ -32,6 +34,10 @@ def _format_reports(reports: list[SpecialistReport]) -> str:
 
 def _format_perspectives(perspectives: list[DeciderPerspective]) -> str:
     return json.dumps([p.model_dump() for p in perspectives], indent=2)
+
+
+def _format_reactions(reactions: list[DeciderReaction]) -> str:
+    return json.dumps([r.model_dump() for r in reactions], indent=2)
 
 
 @weave.op
@@ -111,13 +117,17 @@ async def synthesis(
     stage1: list[DeciderPerspective],
     stage2: list[DeciderReaction],
 ) -> FinalBrief:
-    # TODO: real prompt + llm.structured() call
-    # return await llm.structured(config.SYNTHESIS_MODEL, system, user, FinalBrief)
-    label = deck.customer.split(".")[0]
-    return FinalBrief(
-        recommendation=f"[stub] proceed with diligence on {label}",
-        summary=(
-            f"[stub] {len(specialist_reports)} specialist reports, "
-            f"{len(stage1)} stage-1 and {len(stage2)} stage-2 decider views synthesized"
-        ),
+    user = SYNTHESIS_USER_TEMPLATE.format(
+        deck_json=_format_deck(deck),
+        reports_json=_format_reports(specialist_reports),
+        stage1_json=_format_perspectives(stage1),
+        stage2_json=_format_reactions(stage2),
+    )
+    return await llm.structured(
+        config.SYNTHESIS_MODEL,
+        SYNTHESIS_SYSTEM,
+        user,
+        FinalBrief,
+        tools=None,
+        max_tokens=6000,
     )

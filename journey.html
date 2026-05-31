@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advisor Journey</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --specialist: #3b82f6;
+      --decider: #f59e0b;
+      --structural: #64748b;
+      --agree: #22c55e;
+      --pushback: #ef4444;
+      --edge: #475569;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 1fr min(420px, 38vw);
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      gap: 0;
+    }
+    header {
+      grid-column: 1 / -1;
+      padding: 16px 24px;
+      background: var(--panel);
+      border-bottom: 1px solid #334155;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .session-id { color: var(--muted); font-size: 0.9rem; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    button, .file-btn {
+      background: #334155;
+      color: var(--text);
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover, .file-btn:hover { background: #475569; }
+    button.primary { background: var(--specialist); }
+    button.primary:hover { background: #2563eb; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .file-btn { display: inline-block; position: relative; overflow: hidden; }
+    .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .readout {
+      padding: 12px 24px;
+      background: #172554;
+      border-bottom: 1px solid #334155;
+      grid-column: 1 / -1;
+      font-size: 1.05rem;
+      line-height: 1.5;
+    }
+    .readout strong { color: #93c5fd; font-size: 1.25rem; }
+    .graph-wrap {
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .graph-wrap svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .side-panel {
+      background: var(--panel);
+      border-left: 1px solid #334155;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .side-panel h2 {
+      font-size: 1.15rem;
+      margin-bottom: 4px;
+      text-transform: capitalize;
+    }
+    .side-panel .subtitle {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+    }
+    .panel-item {
+      background: #0f172a;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      border-left: 4px solid var(--specialist);
+    }
+    .panel-item.decider { border-left-color: var(--decider); }
+    .panel-item.agree { border-left-color: var(--agree); }
+    .panel-item.pushback { border-left-color: var(--pushback); }
+    .panel-item h3 { font-size: 0.95rem; margin-bottom: 6px; }
+    .panel-item p { font-size: 0.88rem; line-height: 1.45; color: #cbd5e1; }
+    .confidence {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .confidence-bar {
+      flex: 1;
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .confidence-fill {
+      height: 100%;
+      background: var(--decider);
+      border-radius: 3px;
+    }
+    .legend {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(30, 41, 59, 0.92);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      line-height: 1.8;
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .legend-line {
+      display: inline-block;
+      width: 20px;
+      height: 3px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .stage-label {
+      font-size: 0.75rem;
+      fill: var(--muted);
+      text-anchor: middle;
+    }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; }
+      .side-panel { border-left: none; border-top: 1px solid #334155; max-height: 40vh; }
+      .graph-wrap { min-height: 55vh; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const SESSION = {"session_id": "bc700e8d94b1", "pitch_deck": {"problem": "AI moves faster than anyone can track. Every day brings more papers, threads, and community discussions than a person can read, and most of it is irrelevant to any given individual. Existing feeds optimize for engagement, not usefulness.", "customer": "People who need to stay current on AI — ML researchers, applied AI engineers, and technical founders. A specific beachhead segment is not yet chosen.", "solution": "A personal agent that scrapes ArXiv, Reddit, and technical communities overnight, scores everything against a per-user preference vector, and delivers a grounded morning briefing. The vector is learned from how you read — ratings, skips, follow-ups.", "wedge": "The preference vector compounds and is unique per user, so the relevance advantage can't be copied.", "current_stage": "Personal prototype. Founder uses it daily. A few interested users, none onboarded. No funding.", "founder_background": "Solo founder. Master's in AI from Boston University; specializes in building AI systems. Strong technically, new to the business side.", "traction": "Founder is the only daily active user. A few people expressed interest but none have been onboarded.", "key_assumptions": ["Per-user preference vectors can be learned quickly enough from reading behavior to deliver value.", "ArXiv, Reddit, and technical communities cover most of what target users need to track.", "A morning briefing is the right delivery format versus real-time feeds.", "A viable beachhead exists among ML researchers or applied AI engineers with acute pain."], "current_ask": "Turn the personal prototype into a product others can use. Help finding investors and raising a first round, getting and onboarding real users, and deciding what to build next."}, "specialist_reports": [{"role": "marketer", "focus_items": [{"title": "Choose and Lock a Beachhead Segment This Week", "why_now": "The deck explicitly states 'a specific beachhead segment is not yet chosen.' Without a locked ICP, every subsequent GTM decision — messaging, channel, onboarding — is undirected. This is the single highest-leverage marketing decision right now.", "action": "Write two one-page ICP briefs — one for ML researchers (academic/industry), one for applied AI engineers — covering: where they spend time online, how they currently stay current, what 'irrelevant noise' costs them in hours per week, and willingness to pay. Present both to 5 people from each segment in 20-minute calls this week, then pick one.", "success_criteria": "By end of week, a single beachhead segment is chosen with documented rationale based on interview responses, not assumption.", "evidence_citations": ["Deck states target users are 'ML researchers, applied AI engineers, and technical founders' but explicitly notes 'a specific beachhead segment is not yet chosen.'", "Deck flags as a key assumption: 'A viable beachhead exists among ML researchers or applied AI engineers with acute pain.'"]}, {"title": "Run 15 Problem-Validation Interviews Before Building Onboarding", "why_now": "The only daily active user is the founder. 'A few people expressed interest but none have been onboarded.' Onboarding effort is wasted if the pain hypothesis is wrong for anyone other than the founder. Interviews are faster and cheaper than building.", "action": "Recruit 15 people matching the chosen beachhead segment (use LinkedIn, Twitter/X AI communities, Reddit r/MachineLearning) and run 20-minute jobs-to-be-done interviews this week. Ask: How do you currently track AI developments? How long does it take per day? What do you miss? What would you pay to get that time back?", "success_criteria": "15 interviews completed; at least 10 of 15 independently describe a version of the 'too much noise, not enough relevant signal' problem without being led.", "evidence_citations": ["Deck describes the problem as 'every day brings more papers, threads, and community discussions than a person can read, and most of it is irrelevant to any given individual.'", "Deck notes traction is: 'Founder is the only daily active user. A few people expressed interest but none have been onboarded.'"]}, {"title": "Define a Single Positioning Line Anchored to the Compounding Vector", "why_now": "The wedge is clearly articulated in the deck — the preference vector is personal and compounds — but no positioning language exists yet. Early users and any future word-of-mouth need a crisp one-liner to spread the product.", "action": "Draft three positioning statements this week, each under 20 words, that communicate the compounding personalization wedge to the chosen beachhead. Test each statement verbally on 5 segment members from your interview pool and record which framing generates 'I need that' vs. blank stares.", "success_criteria": "One positioning statement selected that at least 4 of 5 test subjects can repeat back accurately and say describes a real pain they have.", "evidence_citations": ["Deck states the wedge: 'The preference vector compounds and is unique per user, so the relevance advantage can't be copied.'", "Deck describes the solution as scoring 'everything against a per-user preference vector' learned from 'ratings, skips, follow-ups.'"]}, {"title": "Identify the One Acquisition Channel to Own First", "why_now": "With zero onboarded users and no funding, channel focus is existential. Spreading across channels at this stage guarantees mediocrity everywhere. The beachhead segment (ML researchers / applied AI engineers) has identifiable online habitats already named in the deck.", "action": "Pick exactly one channel from this list — (a) Twitter/X AI researcher network, (b) r/MachineLearning or r/LocalLLaMA on Reddit, (c) direct outreach via ArXiv author emails — and spend 5 hours this week posting or messaging authentically in that channel. Share a real example of the founder's own morning briefing output as a conversation starter, not an ad.", "success_criteria": "At least 3 inbound signups or DM requests for early access generated from the chosen channel within 7 days.", "evidence_citations": ["Deck identifies solution sources as 'ArXiv, Reddit, and technical communities,' meaning the target users already live in these spaces.", "Deck customer description: 'ML researchers, applied AI engineers, and technical founders — people who need to stay current on AI.'"]}], "watch_items": [{"trigger": "Interview respondents say they already have a good-enough solution (newsletters, Feedly, a colleague's curation)", "why_it_matters": "If the problem is 'solved enough' by existing tools, the market may be smaller or harder to penetrate than assumed; ICP or positioning may need to shift toward a more acute sub-segment."}, {"trigger": "No segment member can articulate the cost of AI noise in time or missed decisions without prompting", "why_it_matters": "Absence of felt pain means demand generation will require expensive education, not just awareness — a significant GTM headwind for a solo, unfunded founder."}, {"trigger": "Early users engage with briefings but do not return after day 3", "why_it_matters": "Indicates the morning briefing format assumption may be wrong, or the preference vector isn't learning fast enough to deliver value — a core positioning and retention risk."}, {"trigger": "A well-funded competitor (e.g., a newsletter with personalization features) launches or gains press coverage", "why_it_matters": "The compounding vector wedge is durable only if the founder reaches defensible user depth before a capitalized competitor can replicate the feedback loop at scale."}], "assumptions_made": ["Assumed the founder has some existing network in AI communities (Twitter, Reddit, university contacts) that can be tapped for interview recruitment without paid outreach.", "Assumed 'a few interested users' means at least 5-10 identifiable people who can be contacted for interviews or early onboarding.", "Assumed the beachhead will be either ML researchers or applied AI engineers, not technical founders, as the latter group is smaller and harder to reach uniformly.", "Assumed the morning briefing format is a marketing differentiator (vs. real-time alerts) that can be messaged as a feature, not just a technical choice."], "founder_questions": ["Who specifically are the 'few people who expressed interest' — are they ML researchers, applied AI engineers, or technical founders, and how did they find out about the product?", "Do you have any existing relationships or community standing in the ML researcher or applied AI engineer communities (Twitter followers, GitHub presence, academic co-authors) that could seed early distribution?", "Have you ever shared a sample briefing publicly (a tweet, a post, a screenshot)? If so, what was the response?", "What does your own daily briefing output actually look like — is it a digest email, a dashboard, a Slack message? This will directly shape positioning language."], "strategic_questions": ["Should the beachhead be ML researchers (smaller, more homogeneous, reachable via ArXiv/Twitter, may have lower willingness to pay) or applied AI engineers (larger, more diffuse, higher commercial willingness to pay but harder to reach as a unified segment)?", "Is 'morning briefing' a permanent product format or a wedge — and if users eventually want real-time or API access, does the GTM strategy need to account for that evolution from day one?", "Given the compounding vector is the core wedge, should early GTM deliberately target power users who read heavily (generating faster vector learning) rather than casual users, even if that shrinks the addressable pool initially?"]}, {"role": "legal", "focus_items": [{"title": "ArXiv and Reddit Scraping: Terms of Service and API Rights", "why_now": "The solution explicitly describes scraping ArXiv, Reddit, and technical communities overnight. This is the core data acquisition mechanism. If the scraping approach conflicts with platform terms, the product's data pipeline could be shut down before it scales.", "action": "Pull the current terms of service for ArXiv, Reddit, and any other targeted community platforms this week and create a side-by-side table of what each explicitly permits or prohibits regarding automated data collection — bring this document to a qualified attorney for a 30-minute review.", "success_criteria": "A clear, attorney-reviewed summary of which sources can be accessed via official APIs versus which require further legal review before scraping continues.", "evidence_citations": ["Deck states the agent 'scrapes ArXiv, Reddit, and technical communities overnight' as its core data acquisition method."]}, {"title": "Summarizing and Redistributing Third-Party Content", "why_now": "The product delivers a 'morning briefing' grounded in scraped papers and community discussions. Reproducing, summarizing, or excerpting third-party copyrighted content — including ArXiv preprints and Reddit posts — in a delivered product raises copyright and fair use questions that are worth confirming before onboarding paying users.", "action": "Document exactly what content is included in the morning briefing output (verbatim excerpts, paraphrases, titles only, URLs) and bring a concrete example briefing to counsel this week to discuss whether the redistribution format requires licensing or raises copyright exposure.", "success_criteria": "Attorney-reviewed characterization of the content redistribution format and any changes needed before onboarding users at scale.", "evidence_citations": ["Deck states the agent delivers 'a grounded morning briefing' drawn from scraped ArXiv, Reddit, and technical community content."]}, {"title": "User Reading Behavior Data: Privacy Policy and Consent Framework", "why_now": "The preference vector is learned from how users read — 'ratings, skips, follow-ups.' This is behavioral data collection that may implicate GDPR, CCPA, and other privacy frameworks depending on user geography. The founder is preparing to onboard real users for the first time, making this the right moment to establish a compliant consent and data handling baseline before any data is collected.", "action": "Draft a list of every data point the system collects per user (reading events, ratings, skips, derived vectors) and the intended storage and retention approach, then bring this data map to a privacy-focused attorney to identify what disclosures, consent mechanisms, and a privacy policy must be in place before onboarding begins.", "success_criteria": "A data map reviewed by counsel and a determination of minimum-viable privacy policy and consent requirements before the first non-founder user is onboarded.", "evidence_citations": ["Deck states the preference vector 'is learned from how you read — ratings, skips, follow-ups,' indicating ongoing behavioral data collection per user.", "Deck states the ask includes 'getting and onboarding real users,' signaling imminent first-user data collection."]}, {"title": "Terms of Service for the Product Itself", "why_now": "The founder is moving from a personal prototype to a product others will use. Without terms of service governing user conduct, data use, and liability limitations, the founder has no contractual basis for how user data can be used (including to train or refine the preference vector model), and no limitation on liability claims from early users.", "action": "Engage a startup attorney this week to produce a minimum-viable terms of service and privacy policy covering: (1) what user data is collected and how it is used, (2) whether user behavior data is used to improve the model, (3) liability limitations, and (4) acceptable use — target having a draft before the first external user is onboarded.", "success_criteria": "A drafted terms of service and privacy policy reviewed by counsel and in place before any non-founder user account is created.", "evidence_citations": ["Deck states the current ask is to 'turn the personal prototype into a product others can use' and to begin 'getting and onboarding real users.'", "Deck states the preference vector compounds from user reading behavior, implying user data is used to train or refine the system."]}], "watch_items": [{"trigger": "Reddit or ArXiv changes their API terms or introduces rate limits that restrict automated overnight data collection", "why_it_matters": "The entire data pipeline depends on these sources; a terms change could require rapid product redesign or cessation of data collection from a key source."}, {"trigger": "A user located in the EU or California is onboarded without a compliant privacy notice and consent flow in place", "why_it_matters": "GDPR and CCPA have specific requirements around behavioral data collection and consent; onboarding users in covered jurisdictions without compliant disclosures may create regulatory exposure worth discussing with counsel before it occurs."}, {"trigger": "The morning briefing begins including substantial verbatim text from paywalled or restrictively licensed publications that appear in ArXiv preprint form", "why_it_matters": "ArXiv hosts preprints, but some authors' underlying publication agreements with journals may affect redistribution rights; this is worth flagging to counsel if the briefing format evolves to include longer excerpts."}], "assumptions_made": ["Assumed the scraping is currently automated and running against live ArXiv and Reddit endpoints, not using official APIs exclusively — if official APIs are already in use, the scraping ToS risk profile changes.", "Assumed the preference vector and user reading data are stored server-side by the founder, not only on-device — if fully local, privacy exposure is different.", "Assumed the founder has not yet engaged any legal counsel or established any terms of service or privacy policy, given the product is described as a personal prototype with no external users.", "Assumed users will include individuals who may be located in GDPR or CCPA jurisdictions given the target customer is ML researchers globally."], "founder_questions": ["Is the data collection currently done via official APIs (ArXiv OAI-PMH, Reddit API) or via direct HTTP scraping of web pages?", "Where is user reading behavior data stored — on the founder's servers, a cloud provider, or locally on user devices?", "Has any legal counsel been engaged at any point, and is any form of privacy policy or terms of service currently in place?", "What content does the morning briefing actually include — full abstracts, excerpts, paraphrased summaries, titles and links only?", "Are any of the interested but not-yet-onboarded users located outside the United States?"], "strategic_questions": ["At what point before onboarding users should the founder prioritize formalizing legal infrastructure (ToS, privacy policy, data processing agreements) versus moving quickly to validate the product — and what is the minimum viable legal baseline counsel recommends?", "If ArXiv or Reddit's terms do not permit the current scraping approach, should the product pivot to API-only data sources, and how does that affect the coverage assumption in the deck?", "Should the product's terms of service explicitly grant the founder the right to use user reading behavior to improve the shared model components, or should each user's data be siloed — and what are the trust and legal implications of each approach?"]}, {"role": "tech", "focus_items": [{"title": "Harden the overnight scraping pipeline before onboarding any external users", "why_now": "The system currently runs for one user (the founder). Even 5–10 concurrent users will expose race conditions, rate-limit failures, and partial-run silent errors that break morning briefings. A broken first briefing kills retention permanently.", "action": "This week: instrument the existing scraper with structured logging and add a nightly health-check job that asserts minimum record counts per source (ArXiv, Reddit) and sends an alert (email or Slack webhook) if any source returns zero results. Manually simulate a failed run and verify the alert fires.", "success_criteria": "Zero silent failures across 7 consecutive nightly runs; any partial failure produces an alert within 5 minutes of job completion.", "evidence_citations": ["Deck states solution 'scrapes ArXiv, Reddit, and technical communities overnight'", "Deck states founder is 'the only daily active user' — pipeline has never been stress-tested beyond one user"]}, {"title": "Architect per-user compute isolation now, before the first external onboarding", "why_now": "The preference vector is learned per user and scoring runs overnight. A single-tenant architecture (one cron job, one vector) will require a full rewrite at 10 users. The cost and complexity of that rewrite mid-onboarding will stall growth.", "action": "This week: refactor the nightly job into a parameterized function keyed by user_id. Even if only one user_id exists, every data artifact (raw scrape cache, scored results, preference vector state) must live under a user-namespaced path in storage. Document the schema so a second user can be added by inserting one row, not by forking code.", "success_criteria": "A second synthetic user_id can be created and run end-to-end through the pipeline in under 30 minutes with zero code changes.", "evidence_citations": ["Deck describes 'per-user preference vector' as core to the solution", "Deck's current ask is explicitly 'turn the personal prototype into a product others can use'"]}, {"title": "Define and instrument the minimum preference-vector cold-start path", "why_now": "New users have zero reading history, so the vector is empty and early briefings will be low-quality. This is the highest technical risk to early retention, but it is solvable with a lightweight onboarding signal-collection step.", "action": "This week: design and implement a 5-question onboarding survey (topic tags, specific researchers, keywords to avoid) that seeds the initial preference vector with explicit priors. Store these as weighted seed features in the same vector schema used for learned features, so the learning loop can override them incrementally.", "success_criteria": "A brand-new user_id that completes the survey receives a first briefing with at least 5 scored items rated 'relevant' by the founder acting as proxy reviewer.", "evidence_citations": ["Deck states 'the vector is learned from how you read — ratings, skips, follow-ups'", "Deck's key assumption: 'per-user preference vectors can be learned quickly enough from reading behavior to deliver value'"]}, {"title": "Audit and cap LLM and embedding API costs per user per night before any paid or wide onboarding", "why_now": "The briefing pipeline makes LLM calls and presumably embedding calls to score documents against the preference vector. At one user the cost is invisible; at 50 users with no cap it could be existential for a no-funding solo founder.", "action": "This week: add per-run cost logging by counting tokens in and out for every LLM call and embedding call. Compute the estimated cost per user per night. Set a hard token-budget ceiling per user per run with graceful degradation (score fewer documents, not zero documents) if the ceiling is hit.", "success_criteria": "Cost per user per night is known to within 20% accuracy; a ceiling is enforced in code and tested with a synthetic high-volume input.", "evidence_citations": ["Deck describes overnight scoring 'against a per-user preference vector' implying repeated embedding/LLM calls per user", "Deck states 'no funding' — uncontrolled API costs are a direct solo-founder runway risk"]}, {"title": "Reduce solo-founder bus factor on pipeline knowledge", "why_now": "The entire scraping, scoring, and delivery pipeline lives in one person's head and local environment. This is not a team risk comment — it is an infrastructure risk: no runbook means a 2am pipeline failure before a demo is unrecoverable.", "action": "This week: write a single-page runbook (markdown in the repo) covering: how to restart a failed nightly job, how to re-run scoring for a specific user_id for a specific date, and how to roll back a bad preference-vector update. This doubles as the onboarding doc for any future contractor or co-founder.", "success_criteria": "A technically literate person with zero prior context can execute all three runbook procedures without asking the founder a question.", "evidence_citations": ["Deck identifies 'solo founder' with the entire technical system built and operated by one person", "Deck's current ask includes deciding what to build next, implying founder bandwidth is already constrained"]}], "watch_items": [{"trigger": "ArXiv or Reddit changes their HTML structure, rate limits, or robots.txt policy in a way that breaks the scraper", "why_it_matters": "The entire content pipeline depends on these sources. A scraping break silently degrades or eliminates briefings for all users simultaneously with no fallback."}, {"trigger": "Embedding or LLM provider (e.g., OpenAI) changes pricing, deprecates a model, or has an outage", "why_it_matters": "If the preference vector is tied to a specific embedding model's vector space, a model deprecation requires re-embedding all historical user data — a significant unplanned engineering effort at any user count."}, {"trigger": "Nightly job wall-clock time grows beyond the overnight window as user count increases", "why_it_matters": "If per-user scoring is sequential and not parallelized, adding users directly increases total pipeline runtime. Past a threshold, briefings will not be ready by morning."}], "assumptions_made": ["Assuming the pipeline currently runs as a cron job or equivalent scheduler on the founder's local machine or a single cloud instance, not a managed job queue.", "Assuming LLM and/or embedding API calls (e.g., OpenAI) are used for scoring documents against the preference vector, based on the AI-system nature of the product.", "Assuming the preference vector is stored as a dense or sparse numerical vector, not purely as keyword rules, given the deck's framing around learning from behavior.", "Assuming scraping is custom-built rather than using a managed scraping service, given no third-party tools are mentioned.", "Assuming there is no existing test suite or CI pipeline given the personal-prototype stage."], "founder_questions": ["Where does the pipeline currently run — local machine, a single VM, or a managed service? Is there any automated restart on failure?", "What is the current estimated cost per nightly run (API tokens, compute)? Have you measured it?", "Is the preference vector stored in a file, a local database, or a cloud store? Can it survive a machine restart?", "How long does a full nightly run take end-to-end today for one user?", "Are you using a specific embedding model whose vector space the preference vector is tied to? Which one?", "Is any part of the codebase tested with automated tests, or is correctness verified manually?"], "strategic_questions": ["At what user count does the sequential-per-user overnight pipeline architecture need to be replaced with a parallel job queue — and is that the right trigger to introduce infrastructure complexity?", "Should scraping be built and maintained in-house long-term, or replaced with a managed provider (e.g., Apify, Diffbot) once revenue exists? The build-vs-buy decision affects how much of the founder's engineering time is consumed by maintenance versus product.", "Is it worth pinning to a single LLM/embedding provider now for simplicity, or should the vector schema be designed to be model-agnostic from the start to avoid re-embedding cost later?"]}, {"role": "finance", "focus_items": [{"title": "Establish per-user unit economics before any fundraise conversation", "why_now": "The solution scrapes ArXiv/Reddit overnight and runs LLM scoring plus embedding against a per-user preference vector — these are recurring per-user compute costs that compound with scale. With no revenue and no cost model, the founder cannot answer the first question any seed investor will ask: what does it cost to serve one user per month?", "action": "This week: spin up a cost tracking spreadsheet. Log every API call (LLM inference, embedding, scraping) that runs for your own daily briefing. Multiply by 100 users and 1,000 users. Produce a single number: estimated COGS per user per month at each scale.", "success_criteria": "A documented cost-per-user estimate at 100 and 1,000 users, broken down by LLM, embedding, and scraping line items, ready to show an investor.", "evidence_citations": ["Deck states the agent 'scrapes ArXiv, Reddit, and technical communities overnight, scores everything against a per-user preference vector' — each of these steps carries per-user API cost that recurs daily.", "Deck states founder is 'the only daily active user' and 'no funding' — no cost baseline has been established yet."]}, {"title": "Define the minimum financial milestone required before a credible raise", "why_now": "Solo pre-revenue founder with a personal prototype and zero onboarded users cannot raise a meaningful seed round on story alone in the current market. Investors will want proof that strangers derive value, not just the founder. Identifying the exact milestone threshold now determines how long runway must last.", "action": "This week: write a one-page milestone memo defining the pre-raise bar — specifically: number of non-founder daily active users, retention period (e.g., 30-day retention), and any willingness-to-pay signal (even a waitlist with credit card capture). Set a target date. This becomes the fundraise trigger.", "success_criteria": "A written milestone memo with specific, numeric targets (e.g., '25 non-founder DAUs with 4-week retention and 10 users who clicked a paid upgrade prompt') that the founder treats as the gate before investor outreach begins.", "evidence_citations": ["Deck states 'a few interested users, none onboarded' and 'founder is the only daily active user' — traction is insufficient for a credible seed pitch today.", "Deck current ask includes 'help finding investors and raising a first round' — clarifying when to raise is more valuable than starting outreach now."]}, {"title": "Size the first round to fit reality: pre-seed, not seed", "why_now": "Solo founder, no revenue, no co-founder, personal prototype only. The appropriate instrument is a pre-seed round (typically $250K–$750K on a SAFE) sized to buy 12–18 months of runway to hit the milestone memo targets — not a full seed. Over-raising at this stage means unnecessary dilution; under-raising means running out before hitting proof points.", "action": "This week: build a simple 18-month burn model in a spreadsheet. Inputs: founder salary (or $0 if bootstrapping), cloud/API costs at target user scale, and one optional contractor hire. Output: minimum cash needed to reach the milestone memo targets. This number IS your round size.", "success_criteria": "An 18-month budget that ties round size to specific milestone targets, showing investors exactly what the money buys and when the next raise trigger occurs.", "evidence_citations": ["Deck states 'no funding' and 'solo founder' — no existing runway; burn model starts from zero.", "Deck states the ask includes 'turn the personal prototype into a product others can use' — this is the primary capital use case and should be the dominant line item in the budget."]}, {"title": "Design a pricing approach before onboarding the first external users", "why_now": "The deck's wedge — a compounding per-user preference vector — is a strong basis for subscription pricing. Onboarding users for free first and adding pricing later is the classic mistake that resets willingness-to-pay anchoring. Establishing a price signal from day one also provides investor evidence of monetization intent.", "action": "This week: decide on one of two pricing tests to run with the first 25 users: (a) a $10–$20/month waitlist with credit card capture before onboarding, or (b) free onboarding with an explicit 'this will be $X/month in 60 days' notice on the welcome screen. Pick one, document the rationale, and implement it before the first non-founder user is onboarded.", "success_criteria": "First 25 external users are onboarded under a documented pricing test structure; at least one data point on willingness-to-pay (conversion rate or opt-out rate on paid notice) is captured within 30 days.", "evidence_citations": ["Deck states 'a few interested users, none onboarded' — pricing structure can still be set before any external onboarding occurs.", "Deck describes the wedge as a compounding preference vector that 'can't be copied' — this differentiation supports premium subscription pricing rather than free-tier-first."]}, {"title": "Dilution awareness: structure the pre-seed to protect the cap table", "why_now": "Solo founder new to the business side who has not yet raised is at high risk of over-diluting at the earliest stage — either by giving too much equity for too little capital, or by accepting unfavorable SAFE terms (e.g., uncapped SAFEs or low valuation caps). Getting this wrong at pre-seed compounds into every future round.", "action": "This week: research standard pre-seed SAFE terms for 2024 (YC standard SAFE, typical valuation caps for pre-revenue AI tools: $3M–$8M cap range). Write down your personal dilution ceiling for pre-seed (recommended: no more than 10–15% total at this stage). Use this as a non-negotiable floor in any investor conversation.", "success_criteria": "Founder has a documented dilution ceiling and a specific valuation cap range they will accept before entering any investor negotiation, and can articulate why.", "evidence_citations": ["Deck states founder is 'new to the business side' and has 'no funding' — first-time fundraiser risk of accepting unfavorable terms is high.", "Deck states 'solo founder' — no co-founder to pressure-test term sheet decisions; extra caution warranted."]}], "watch_items": [{"trigger": "Per-user LLM/embedding costs exceed $5/user/month at 100-user scale", "why_it_matters": "At a $10–$20/month price point, costs above $5/user compress gross margin below 50%, making the business difficult to defend to investors and unsustainable at scale without a pricing increase or architectural change."}, {"trigger": "Round size requests from investors imply >20% dilution at pre-seed", "why_it_matters": "Pre-seed over-dilution (>15–20%) leaves insufficient equity for a co-founder hire, seed round, and employee option pool without the founder falling below meaningful ownership before Series A."}, {"trigger": "First 25 users show low retention (<50% returning after 2 weeks)", "why_it_matters": "Low early retention destroys the LTV side of unit economics and removes the primary investor proof point; it also signals the preference vector is not learning fast enough, which is the core product assumption."}], "assumptions_made": ["Founder can operate at near-zero or very low salary during pre-seed period, keeping burn dominated by API/cloud costs rather than compensation.", "The overnight batch architecture means LLM/embedding costs are incurred once per user per day, not continuously — this is the most favorable cost structure assumption; if real-time calls are added, costs increase materially.", "Pre-seed capital will come from angels or micro-VCs, not institutional seed funds, given the current stage.", "A $3M–$8M valuation cap range is representative for a pre-revenue AI tool with a solo technical founder in 2024; actual cap depends on investor demand.", "Scraping costs (ArXiv, Reddit) are materially lower than LLM inference costs and are not the primary margin risk."], "founder_questions": ["What is your current monthly spend on API calls (OpenAI, embedding providers, etc.) running the prototype for yourself alone?", "Are you able to operate at $0 or minimal salary for 12–18 months, or do you have a minimum personal runway requirement?", "Have you had any conversation with any of the 'few interested users' about paying for this? What was their reaction?", "Do you have any existing relationships with angels or pre-seed investors in the AI/ML space?", "What is your current personal financial runway (months you can operate before needing income)?"], "strategic_questions": ["Should the founder raise a pre-seed round now to fund user onboarding, or bootstrap to the milestone memo targets first using personal savings — given that traction is currently zero?", "If per-user costs come in high (e.g., $8–12/month), should the pricing strategy shift upward (e.g., $30–50/month prosumer tier targeting applied AI engineers with higher WTP) rather than competing on price?", "At what point does a solo founder need a co-founder or key hire to be credible to seed investors, and should some pre-seed capital be reserved for that hire?"]}], "decider_stage1": [{"role": "investor", "key_findings": [{"finding": "The traction story is currently uninvestable as-is: one DAU (the founder), zero external users onboarded, and no revenue signal. In today's seed market, even pre-seed checks want proof that strangers derive value. This pitch cannot go to investors yet — it needs a milestone gate first.", "citation": "Pitch deck — traction field: 'Founder is the only daily active user. A few people expressed interest but none have been onboarded.' Corroborated by finance report — 'Define the minimum financial milestone required before a credible raise' focus item.", "confidence": 9}, {"finding": "The compounding preference vector is a genuinely differentiated wedge and the most investable idea in the deck — it creates lock-in, is hard to replicate without user data, and tells a clean compounding moat story. This is the one line that will make a pitch room lean forward.", "citation": "Pitch deck — wedge field: 'The preference vector compounds and is unique per user, so the relevance advantage can't be copied.'", "confidence": 8}, {"finding": "Unit economics are completely unknown — the founder cannot answer the first quantitative question any investor will ask. Without a cost-per-user-per-month figure across LLM, embedding, and scraping, there is no way to frame a credible gross margin or defend a valuation cap.", "citation": "Finance report — 'Establish per-user unit economics before any fundraise conversation' focus item, citing 'no cost baseline has been established yet.'", "confidence": 8}, {"finding": "The beachhead is undefined, which makes the TAM story impossible to tell in a pitch. Investors pattern-match 'we serve ML researchers, engineers, and technical founders' as a sign the founder hasn't done the work to know who their customer is — it reads as unfocused, not ambitious.", "citation": "Pitch deck — customer field: 'A specific beachhead segment is not yet chosen.' Corroborated by marketer report — 'Choose and Lock a Beachhead Segment This Week' focus item.", "confidence": 9}, {"finding": "Pre-seed round sizing is the right instrument, but the founder — self-described as new to the business side — is at high risk of over-diluting on the first SAFE, which would damage every future round. Getting cap table structure right at this stage is irreversible.", "citation": "Finance report — 'Dilution awareness: structure the pre-seed to protect the cap table' focus item, citing deck: 'solo founder' and 'new to the business side.'", "confidence": 7}, {"finding": "The absence of any pricing signal before onboarding the first external users is a missed opportunity. Free onboarding without a willingness-to-pay test destroys the one data point that most de-risks monetization for early investors. The compounding vector justifies a premium price anchor from day one.", "citation": "Finance report — 'Design a pricing approach before onboarding the first external users' focus item, citing deck wedge: 'can't be copied.'", "confidence": 7}, {"finding": "There is a non-trivial platform risk that could undermine the entire pitch narrative: if ArXiv or Reddit's terms prohibit the scraping approach, the core data pipeline is legally fragile. Investors in the pitch room will probe this, and 'we scrape overnight' without a clean ToS answer is a red flag.", "citation": "Legal report — 'ArXiv and Reddit Scraping: Terms of Service and API Rights' focus item, citing deck solution: 'scrapes ArXiv, Reddit, and technical communities overnight.'", "confidence": 6}, {"finding": "The technical architecture has never been stress-tested beyond a single user, meaning the first 5-10 onboardings could produce silent failures that kill retention permanently — wiping out whatever traction the founder builds before the pitch. Investor confidence in the demo depends on this working reliably.", "citation": "Tech report — 'Harden the overnight scraping pipeline before onboarding any external users' focus item, citing 'pipeline has never been stress-tested beyond one user.'", "confidence": 6}, {"finding": "A solo technical founder with no business experience and no co-founder will face credibility questions from most seed investors. The pitch will need to proactively address whether a business or GTM co-founder is being sought, or demonstrate founder-led traction so strong it compensates.", "citation": "Pitch deck — founder background field: 'Solo founder. Strong technically, new to the business side.' Finance report strategic question: 'At what point does a solo founder need a co-founder or key hire to be credible to seed investors?'", "confidence": 5}], "priority_actions": ["Define and lock a specific beachhead segment immediately, then use it to construct a focused TAM/SAM/SOM slide — investors cannot evaluate market size against a three-way undefined ICP.", "Set a concrete, numeric milestone gate before beginning any investor outreach: target 25+ non-founder DAUs with 30-day retention and at least one willingness-to-pay data point (waitlist with credit card capture or paid-tier opt-in rate).", "Measure and document cost-per-user-per-night (LLM, embedding, scraping) this week and project to 100 and 1,000 users — this single number determines gross margin, price floor, and round size, and will be asked in every investor meeting.", "Before onboarding the first external user, establish a pricing signal — either a $10-20/month waitlist with credit card capture or an explicit 'this becomes paid in 60 days' notice — to give the raise a monetization proof point rather than a pure usage story.", "Build a clean 18-month burn model tied to milestone targets, determine pre-seed round size ($250K-$750K SAFE range), set a valuation cap floor before any investor conversation, and resolve the ArXiv/Reddit ToS question so platform risk can be addressed confidently in diligence."]}, {"role": "devils_advocate", "key_findings": [{"finding": "The founder is the only real user, making all product assumptions self-referential. A researcher who builds their own tool is notoriously bad at predicting whether strangers will value it — the pain may be idiosyncratic, not market-wide.", "citation": "Pitch deck — traction field: 'Founder is the only daily active user. A few people expressed interest but none have been onboarded.'", "confidence": 9}, {"finding": "No beachhead has been chosen, which means the startup has no GTM strategy at all. This isn't a polish problem — it's a foundational gap that makes every other plan contingent on a decision that hasn't been made.", "citation": "Pitch deck — customer field: 'A specific beachhead segment is not yet chosen.' Also marketer report — item 'Choose and Lock a Beachhead Segment This Week.'", "confidence": 10}, {"finding": "The core wedge — the compounding preference vector — requires sustained user engagement over time to become defensible. But the product has zero external retention data. If early users churn after two or three days, the wedge never compounds and the entire moat story collapses before it starts.", "citation": "Pitch deck — wedge field: 'The preference vector compounds and is unique per user.' Marketer report — watch item: 'Early users engage with briefings but do not return after day 3.'", "confidence": 8}, {"finding": "The scraping pipeline is a single point of failure with no demonstrated resilience beyond one user and one environment. Reddit and ArXiv ToS violations or structural changes could legally or technically kill the data pipeline overnight, with no fallback.", "citation": "Legal report — item 'ArXiv and Reddit Scraping: Terms of Service and API Rights.' Tech report — watch item: 'ArXiv or Reddit changes their HTML structure, rate limits, or robots.txt policy.'", "confidence": 8}, {"finding": "Per-user LLM and embedding costs are unknown and unmeasured. With no funding and daily per-user API calls, uncontrolled costs at even modest scale (50–100 users) could consume the founder's personal runway before a single dollar of revenue is earned.", "citation": "Finance report — item 'Establish per-user unit economics before any fundraise conversation.' Tech report — item 'Audit and cap LLM and embedding API costs per user per night.'", "confidence": 7}, {"finding": "The problem may already be 'solved enough' by well-resourced incumbents. Newsletters like The Batch, AlphaSignal, and Tldr;AI plus tools like Semantic Scholar and Elicit serve overlapping needs. The personalization wedge is theoretically differentiated but unvalidated against actual switching behavior.", "citation": "Marketer report — watch item: 'Interview respondents say they already have a good-enough solution (newsletters, Feedly, a colleague's curation).'", "confidence": 6}, {"finding": "The morning briefing format is an untested assumption, not a validated user preference. Real-time Slack integrations, weekly digests, or API access may be what target users actually want. Building deeply around a single delivery format before validation is premature lock-in.", "citation": "Pitch deck — key assumptions field: 'A morning briefing is the right delivery format versus real-time feeds.' Marketer report — watch item: 'Early users engage with briefings but do not return after day 3.'", "confidence": 6}, {"finding": "A solo founder with no business experience, no co-founder, and no investors faces acute personal failure modes: burnout, a bad term sheet accepted under pressure, or inability to context-switch between engineering and GTM. These are not hypothetical — they are the modal outcome for this profile.", "citation": "Pitch deck — founder background: 'Solo founder... Strong technically, new to the business side.' Finance report — item 'Dilution awareness: structure the pre-seed to protect the cap table.'", "confidence": 7}, {"finding": "The preference vector cold-start problem is a real retention trap. New users with no history will receive low-quality first briefings, and first impressions in a daily-habit product are extremely sticky. The technical team flags this but has not verified the onboarding survey approach is sufficient.", "citation": "Tech report — item 'Define and instrument the minimum preference-vector cold-start path.' Pitch deck — key assumptions field: 'Per-user preference vectors can be learned quickly enough from reading behavior to deliver value.'", "confidence": 7}, {"finding": "Raising a round now would be premature and likely harmful. The founder has no traction, no beachhead, no unit economics, and no retention data. Investor outreach at this stage risks burning warm relationships and anchoring a low valuation cap under pressure.", "citation": "Finance report — item 'Define the minimum financial milestone required before a credible raise.' Pitch deck — current ask: 'Help finding investors and raising a first round.'", "confidence": 8}], "priority_actions": ["Halt investor outreach immediately and instead define a hard numeric milestone gate (e.g., 20 non-founder DAUs with 3-week retention) that must be reached before any fundraise conversation begins.", "Onboard 10–15 real external users within the next two weeks — not to validate the pitch, but to stress-test whether strangers churn after day one; treat any churn under 48 hours as a company-level red flag requiring a pivot in format or problem framing.", "Audit per-user API costs this week and set a hard per-user nightly spend ceiling in code before any external onboarding; unknown costs at this stage are an existential risk for a zero-funding solo founder.", "Get a one-hour attorney review of the ArXiv and Reddit scraping ToS before onboarding any paying or retained users; a cease-and-desist or API shutdown after onboarding creates compounding trust and technical damage.", "Choose one beachhead segment by the end of this week using two 30-minute interviews per segment — not by assumption — and let that choice drive every subsequent product, pricing, and channel decision; without it, all other actions are undirected."]}, {"role": "innovator", "key_findings": [{"finding": "The compounding preference vector is a genuine moat seed. Unlike static newsletters or algorithmic feeds, a system that learns from individual reading behavior over time creates a personalized asset that grows more valuable the longer a user stays — this is a classic data flywheel with real switching cost baked in from day one.", "citation": "Deck wedge field: 'The preference vector compounds and is unique per user, so the relevance advantage can't be copied.'", "confidence": 8}, {"finding": "The problem is structurally real and worsening. AI output velocity is accelerating, not plateauing — meaning the pain this product solves intensifies over time without any action from the founder. The market is growing into the product, not away from it.", "citation": "Deck problem field: 'Every day brings more papers, threads, and community discussions than a person can read, and most of it is irrelevant to any given individual.'", "confidence": 9}, {"finding": "The founder is the ideal first customer — a credible, daily practitioner who built the tool to solve their own acute pain. This is the strongest possible signal that the problem is real, even if it hasn't yet been validated beyond one user.", "citation": "Deck current_stage field: 'Personal prototype. Founder uses it daily.' and founder_background: 'Master's in AI from Boston University; specializes in building AI systems.'", "confidence": 9}, {"finding": "The overnight batch architecture is an underappreciated strategic advantage. Delivering a curated morning briefing rather than a real-time feed creates a deliberate, low-anxiety consumption ritual that differentiates the product behaviorally — not just technically. This is a defensible format choice, not just a technical default.", "citation": "Deck solution field: 'delivers a grounded morning briefing' and key_assumptions: 'A morning briefing is the right delivery format versus real-time feeds.'", "confidence": 6}, {"finding": "The beachhead is unresolved but the upside of getting it right is asymmetric. ML researchers offer fast feedback loops and credibility; applied AI engineers offer higher WTP and a larger total addressable market. Picking correctly and going deep could create a reference segment that pulls in the other organically.", "citation": "Marketer report — 'Choose and Lock a Beachhead Segment This Week' focus item; deck customer field: 'ML researchers, applied AI engineers, and technical founders.'", "confidence": 7}, {"finding": "Cold-start quality is the single biggest risk to the compounding moat narrative. If early briefings are low-quality before the vector is trained, users churn before the flywheel ever spins — permanently eliminating the moat's payoff for those users. Solving cold-start well is not just a tech problem; it is the core retention and moat-activation challenge.", "citation": "Tech report — 'Define and instrument the minimum preference-vector cold-start path' focus item; deck key_assumptions: 'Per-user preference vectors can be learned quickly enough from reading behavior to deliver value.'", "confidence": 8}, {"finding": "Per-user compute costs are currently unmeasured, which obscures whether the unit economics can support a subscription price point that users will actually pay. High LLM/embedding costs could compress margins below investable thresholds before the product finds PMF.", "citation": "Finance report — 'Establish per-user unit economics before any fundraise conversation' focus item; finance watch item: 'Per-user LLM/embedding costs exceed $5/user/month at 100-user scale.'", "confidence": 7}, {"finding": "The target users — ML researchers and applied AI engineers — are highly networked and vocal online. A product that genuinely delights even 20-30 of them has outsized viral potential through exactly the channels (ArXiv Twitter, r/MachineLearning) where new users already congregate. Distribution and product are unusually well-aligned for this segment.", "citation": "Marketer report — 'Identify the One Acquisition Channel to Own First' focus item; deck solution field citing 'ArXiv, Reddit, and technical communities' as both data sources and user habitats.", "confidence": 6}, {"finding": "The founder's technical depth is a real asset but the absence of any business-side experience means the moat could be undermined not by a competitor but by mis-pricing, premature fundraising, or cap table errors at pre-seed. The upside is only capturable if the founder navigates early commercialization correctly.", "citation": "Deck founder_background: 'Strong technically, new to the business side.' Finance report — 'Dilution awareness: structure the pre-seed to protect the cap table' focus item.", "confidence": 8}, {"finding": "There is meaningful but underexplored upside in the preference vector as a B2B asset. A vector that accurately models what an ML team at a mid-size AI company needs to track is potentially valuable to that company as a team-level intelligence layer — an enterprise expansion path that does not require reinventing the core technology.", "citation": "Deck customer field mentions 'technical founders' alongside researchers and engineers; deck wedge: 'unique per user' — though team-level aggregation is not mentioned, the architecture implies it is technically adjacent.", "confidence": 4}], "priority_actions": ["Activate the moat immediately: onboard 10-15 users from the beachhead segment within 2 weeks specifically to start generating real preference vector training data — every day without real users is a day the compounding flywheel is not spinning.", "Solve cold-start before first onboarding: implement the 5-question seed survey the tech report recommends so that day-one briefing quality is high enough to earn the retention needed for the vector to actually compound.", "Measure per-user compute cost this week: quantify LLM and embedding cost per nightly run at 1, 100, and 1,000 users — the entire business model and pricing strategy depends on this number, and it unlocks the fundraise narrative.", "Lock the beachhead segment based on interviews, not assumption: the moat is only defensible if the founder reaches deep engagement in one segment before a capitalized competitor can replicate the feedback loop — speed and focus here are asymmetrically valuable.", "Prototype a team or cohort-level preference layer as a future moat extension: even a rough design document exploring how individual vectors could aggregate for a team use case preserves the option of an enterprise expansion path without distracting from the immediate consumer MVP."]}], "decider_stage2": [{"role": "investor", "reacting_to": ["devils_advocate", "innovator"], "agreements": [{"point": "Halt investor outreach until a hard numeric milestone gate is reached", "why": "The devil's advocate and I are fully aligned here. Zero external users, no retention data, and unknown unit economics make this pitch uninvestable today. Burning warm investor relationships at this stage would be actively harmful and is the right thing to flag loudly."}, {"point": "Beachhead selection is the most urgent foundational gap", "why": "Both peers correctly identify this as blocking everything else — GTM, TAM storytelling, channel strategy, and pricing all depend on a segment choice that hasn't been made. My own finding mirrors this exactly."}, {"point": "Per-user compute costs are an existential unknown that must be measured immediately", "why": "All three perspectives converge here. The devil's advocate frames it as a personal runway risk; the innovator frames it as a unit economics and fundraise narrative problem; I frame it as the number that determines gross margin and valuation cap. Same finding, same urgency."}, {"point": "The compounding preference vector is the single most differentiated and investable element of the pitch", "why": "The innovator and I agree this is a genuine data flywheel with real switching costs — the kind of moat story that makes a pitch room lean forward. It is the asset worth protecting and accelerating."}, {"point": "Cold-start quality is the core retention and moat-activation risk", "why": "The innovator frames this as the single biggest risk to the moat narrative; the devil's advocate flags it as a retention trap. I agree — if early briefings are poor, users churn before the flywheel ever spins, permanently eliminating the moat for those users."}, {"point": "Solo founder with no business experience is a credibility and execution risk", "why": "All three perspectives flag this. The devil's advocate emphasizes burnout and bad term sheet risk; the innovator emphasizes mis-pricing and cap table errors; I flag the need to either find a GTM co-founder or build compensating traction. The risk is real and multidimensional."}, {"point": "ArXiv and Reddit scraping ToS is a legal fragility that will surface in diligence", "why": "The devil's advocate and I both flag this as a red flag investors will probe. It needs to be resolved before any external onboarding or investor conversation, not after."}], "pushbacks": [], "missed_by_them": [{"point": "Pricing signal before first external onboarding is a distinct and critical action — not just a unit economics question", "why_it_matters": "Both peers focus on measuring costs and onboarding users, but neither explicitly calls out that onboarding users for free without a willingness-to-pay test destroys the one monetization data point most useful to early investors. A $10-20/month waitlist with credit card capture, or an explicit 'this becomes paid in 60 days' notice, turns the first cohort into a monetization proof point rather than a pure usage story. The compounding vector explicitly justifies a premium price anchor from day one, and that signal is irreversible to capture — you cannot retroactively charge a cohort you already trained to expect free."}, {"point": "Dilution structure on the first SAFE is an irreversible cap table decision that the founder is at high risk of getting wrong", "why_it_matters": "Neither peer addresses the mechanics of pre-seed SAFE structuring. A solo founder new to the business side, under pressure to close a first check, is the modal profile for accepting a low valuation cap or unfavorable MFN terms that permanently damage every downstream round. Getting this right — setting a defensible cap floor before any investor conversation — is not recoverable after the fact, unlike most other early-stage mistakes. This deserves explicit priority action, not just a passing mention."}]}, {"role": "devils_advocate", "reacting_to": ["investor", "innovator"], "agreements": [{"point": "Traction is uninvestable now; a hard milestone gate must precede any investor outreach.", "why": "Both peers independently arrive at the same conclusion I do: one founder-DAU and zero external users is not a fundable story. The investor's 25+ DAU / 30-day retention gate and my 20 non-founder DAU / 3-week retention gate are essentially the same prescription. Strong convergence here."}, {"point": "Unit economics are unknown and must be measured this week.", "why": "All three perspectives flag the LLM and embedding cost gap as a blocking issue. The investor correctly notes it will be the first quantitative question in any pitch meeting; I flag it as an existential risk for a zero-funding solo founder. Same problem, slightly different urgency framing."}, {"point": "The beachhead gap is foundational, not cosmetic.", "why": "Investor, innovator, and I all treat the undefined beachhead as a first-order blocker. I frame it as 'no GTM strategy at all'; the investor frames it as inability to tell a coherent TAM story; the innovator frames it as the key to activating the moat asymmetrically. All correct and mutually reinforcing."}, {"point": "Cold-start quality is the primary retention and moat-activation risk.", "why": "Both peers flag this prominently. The innovator articulates it most clearly: users who churn before the vector trains are permanently lost moat opportunities. I agree this is a genuine technical and product risk, not just a polish issue."}, {"point": "The compounding preference vector is the most differentiated element of the pitch.", "why": "Both investor and innovator treat it as the one genuinely investable idea. I don't dispute this — my concern is that it's unvalidated against real retention behavior, which is a different claim than denying its theoretical strength."}, {"point": "ArXiv and Reddit ToS exposure is a real pitch and legal risk.", "why": "Investor flags it as a red flag in the pitch room; I flag it as a potential overnight company-killer. Both are correct and the legal review action is the same."}, {"point": "Solo founder with no business experience is a credibility and execution risk.", "why": "All three perspectives note this. The investor frames it as a pitch credibility problem; I frame it as a modal failure mode (burnout, bad term sheet, inability to context-switch). Complementary, not contradictory."}], "pushbacks": [{"point": "The innovator treats the overnight batch briefing format as a 'defensible strategic choice' rather than an untested assumption.", "counter": "Calling it a 'deliberate, low-anxiety consumption ritual' is retrofitting a narrative onto an architectural default. The pitch deck itself lists morning briefing format as a key assumption, not a validated preference. The tech and marketer reports both flag day-3 churn as a live risk. Defending the format as strategically intentional before a single external user has retained past day 3 is premature confidence that could cause the founder to under-test the most pivotal UX decision they face."}, {"point": "The innovator surfaces a B2B team-level preference vector expansion path as a 'meaningful upside.'", "counter": "Flagging an enterprise expansion path as meaningful at a stage where there are zero external users and no validated consumer retention is a distraction risk, not an opportunity. For a solo technical founder new to the business side, premature B2B framing can cause misallocation of the very limited attention budget. This idea should be parked explicitly until consumer PMF is proven, not surfaced as a priority-adjacent insight."}], "missed_by_them": [{"point": "The founder's self-referential product development loop is a systemic bias risk, not just a traction gap.", "why_it_matters": "Both peers note the single-DAU traction problem but frame it primarily as an investor readiness issue. The deeper risk is epistemological: a researcher who built a tool to solve their own pain has strong motivated reasoning to interpret every ambiguous signal as validation. This bias systematically distorts interview data, retention interpretation, and feature prioritization. Neither peer addresses the need for a deliberate de-biasing practice — e.g., having someone other than the founder conduct early user interviews and interpret churn data — which is a structural fix, not just a traction milestone."}, {"point": "Raising at this stage risks burning warm investor relationships that are the founder's most valuable pre-seed asset.", "why_it_matters": "Both peers correctly say 'don't raise yet,' but neither explicitly names the relationship-burn risk of premature outreach. In pre-seed markets, a founder who pitches too early to a warm angel or micro-VC and gets a polite pass often permanently resets that relationship to 'already passed.' The cost is not just a low valuation cap — it's the permanent loss of the most accessible capital sources at the moment they will actually be needed. This deserves explicit framing as an irreversible action, not just a sequencing preference."}]}, {"role": "innovator", "reacting_to": ["investor", "devils_advocate"], "agreements": [{"point": "Compounding preference vector is the core moat and the most differentiated element of the pitch.", "why": "Both peers correctly identify this as the strongest asset — the investor calls it 'the one line that will make a pitch room lean forward' and the devil's advocate acknowledges it theoretically differentiates. My stage-1 agrees fully: this is the flywheel that justifies the entire venture thesis."}, {"point": "Cold-start quality is a genuine retention trap that must be solved before external onboarding.", "why": "Devil's advocate flags it directly and investor notes silent failures could kill retention. My stage-1 treats this as the core moat-activation challenge — if early briefings are poor, users churn before the vector ever compounds. Full alignment."}, {"point": "Per-user compute costs are unknown and must be measured immediately.", "why": "Both peers call this out as a blocking issue. My stage-1 independently flagged it as obscuring whether unit economics can support any viable price point. This is unanimous across all three views."}, {"point": "Beachhead is undefined and this is a foundational problem, not a polish issue.", "why": "Devil's advocate gives it a confidence-10 finding; investor notes it makes the TAM story impossible. My stage-1 agrees and adds the asymmetric upside framing — picking correctly and going deep creates a reference segment that pulls in others organically."}, {"point": "Investor outreach should be deferred until real traction milestones are reached.", "why": "Investor sets a concrete gate (25+ non-founder DAUs, 30-day retention, WTP signal) and devil's advocate calls raising now 'premature and likely harmful.' My stage-1 implicitly supports this by prioritizing flywheel activation and cost measurement before any fundraise narrative."}, {"point": "Platform/scraping ToS risk is a real vulnerability that needs to be resolved before scaling.", "why": "Both peers flag ArXiv and Reddit ToS as a legal fragility. My stage-1 did not foreground this, but I agree it is a genuine risk that should be resolved before onboarding paying users."}, {"point": "Solo founder with no business-side experience creates execution risk around commercialization.", "why": "Investor notes credibility questions and devil's advocate cites burnout and bad term sheet risk. My stage-1 agreed — the moat is only capturable if the founder navigates early commercialization correctly, and mis-pricing or cap table errors are real threats."}], "pushbacks": [{"point": "Devil's advocate suggests the pain may be 'idiosyncratic, not market-wide' because the founder is the only user.", "counter": "This framing undersells the structural evidence. The problem — AI output velocity accelerating beyond any individual's reading capacity — is observable and worsening independently of the founder's experience. The founder being a great first customer is a positive signal, not a reason to doubt market breadth. The right response is to validate quickly with external users, not to treat the problem as suspect from the outset."}, {"point": "Devil's advocate implies the morning briefing format is premature lock-in and may be wrong.", "counter": "I'd push back mildly here. The morning briefing is not just a format guess — it is a deliberate behavioral differentiation from real-time feeds, creating a low-anxiety consumption ritual. That said, I agree it needs validation. The distinction is: it's a considered hypothesis worth testing fast, not an arbitrary assumption that signals poor judgment."}], "missed_by_them": [{"point": "The B2B / team-level aggregation of preference vectors as a future moat extension and enterprise expansion path.", "why_it_matters": "Neither peer discusses the possibility that individual preference vectors could aggregate into a team-level or company-level intelligence layer — a natural upsell to mid-size AI companies tracking a research domain. This preserves a high-value expansion path that does not require reinventing the core technology and significantly expands the TAM story without diluting the consumer wedge. It is worth at least a design-document placeholder so the option is not accidentally architected away."}, {"point": "Distribution and product are unusually well-aligned for the target segment — the viral loop is built into the product's data sources.", "why_it_matters": "Neither peer highlights that ML researchers and applied AI engineers are highly networked and vocal on exactly the channels (ArXiv Twitter, r/MachineLearning) where new users congregate. A product that genuinely delights 20-30 of them has outsized organic distribution potential that most B2C startups lack. This changes the GTM calculus — the first acquisition channel may be nearly free if the product delivers real value, which raises the ROI on solving cold-start and onboarding quality above and beyond just retention."}]}], "final_brief": {"focus_list": [{"title": "Lock One Beachhead Segment This Week — by Interview, Not Assumption", "action": "Write two one-page ICP briefs (ML researchers vs. applied AI engineers) covering where they live online, how they currently stay current, the hours/week they lose to noise, and willingness-to-pay. Run 20-minute jobs-to-be-done interviews with at least 5 people per segment, then pick ONE segment with documented rationale. To counter founder self-validation bias, where possible let someone other than the founder run or review the interviews.", "success_criteria": "By end of week a single beachhead segment is chosen with written rationale grounded in interview responses; at least 10 of ~15 interviewees independently describe the 'too much noise, not enough relevant signal' pain without being led.", "rationale": "Unanimous top priority across the marketer report and all three deciders (investor, devils_advocate at confidence 10, innovator). Every downstream decision — TAM story, channel, pricing, onboarding — is undirected until this is locked. The devils_advocate adds the critical de-biasing point: a researcher who built their own tool will over-read ambiguous signals as validation."}, {"title": "Measure Per-User Compute Cost and Cap It in Code", "action": "Add per-run token/cost logging to every LLM and embedding call this week and compute estimated COGS per user per night. Project to 100 and 1,000 users, broken out by LLM, embedding, and scraping line items. Enforce a hard per-user nightly token ceiling in code with graceful degradation (score fewer documents, never zero), and test it against a synthetic high-volume input.", "success_criteria": "Cost-per-user-per-night known to within 20%, projected to 100 and 1,000 users in a document ready to show an investor; a ceiling is enforced in code and verified with a stress test.", "rationale": "Flagged by finance and tech specialists and converged on by all three deciders. Investor calls it the first question any investor asks (determines gross margin and valuation cap); devils_advocate calls it an existential runway risk for a zero-funding solo founder; innovator ties it to whether any viable price point exists. Single highest-leverage merged technical+financial item."}, {"title": "Solve Cold-Start, Then Onboard 10–15 Real External Users to Start the Flywheel", "action": "Before onboarding, implement a 5-question onboarding survey (topic tags, specific researchers, keywords to avoid) that seeds the initial preference vector as weighted priors the learning loop can override. Harden the pipeline first: add structured logging plus a nightly health-check that alerts if any source returns zero results, and refactor the nightly job to be parameterized by user_id with all artifacts under user-namespaced storage. Then onboard 10–15 users from the chosen beachhead and watch retention closely.", "success_criteria": "A new user completing the survey gets a first briefing with at least 5 items judged relevant; a second synthetic user runs end-to-end in under 30 minutes with zero code changes; zero silent pipeline failures across 7 nightly runs; 10–15 external users onboarded with day-3+ retention tracked.", "rationale": "Merges the tech report's cold-start, pipeline-hardening, and per-user isolation items with the innovator's 'activate the moat now' and devils_advocate's 'stress-test whether strangers churn' actions. All deciders flag cold-start as the core retention and moat-activation risk — a poor first briefing permanently loses a user before the compounding vector ever spins up."}, {"title": "Set a Pricing Signal and a Numeric Milestone Gate Before Raising — and Hold the Cap Table", "action": "Before onboarding the first external user, choose one pricing test: a $10–20/month waitlist with credit-card capture, OR free onboarding with an explicit 'this becomes $X/month in 60 days' notice. Write a one-page milestone memo defining the pre-raise gate (e.g., 20–25 non-founder DAUs, 3–4 week retention, one willingness-to-pay data point). Build an 18-month burn model to size a pre-seed round ($250K–$750K SAFE). Research 2024 standard SAFE terms and set a personal dilution ceiling (~10–15%) and valuation-cap floor before any investor conversation. Do NOT begin outreach until the gate is hit.", "success_criteria": "First external cohort onboarded under a documented pricing test with at least one WTP data point captured within 30 days; a written milestone memo with numeric targets exists; an 18-month burn model ties round size to those targets; a documented dilution ceiling and valuation-cap floor are set before any investor call.", "rationale": "Finance specialist plus all three deciders converge that the pitch is uninvestable today and outreach should be halted. The investor and devils_advocate both stress two irreversible points the others underweight: capturing a pricing/WTP signal cannot be done retroactively on a free-trained cohort, and a bad first SAFE permanently damages every future round. Devils_advocate also flags that pitching too early permanently resets warm investor relationships to 'already passed.'"}], "watchlist": [{"trigger": "Early users engage but do not return after day 3 (especially churn under 48 hours).", "why_it_matters": "Signals the morning-briefing format may be wrong or the vector isn't learning fast enough — the moat never compounds. Devils_advocate treats sub-48h churn as a company-level red flag requiring a format or problem-framing pivot."}, {"trigger": "Interviewees say they already have a good-enough solution (The Batch, AlphaSignal, TLDR AI, Feedly, Semantic Scholar, Elicit) and show no switching intent.", "why_it_matters": "If the problem is 'solved enough,' demand requires expensive education, not just awareness — a serious headwind for a solo unfunded founder, and the personalization wedge remains unvalidated against real switching behavior."}, {"trigger": "ArXiv or Reddit changes ToS, API terms, rate limits, robots.txt, or HTML structure.", "why_it_matters": "The entire content pipeline depends on these sources; a single change can legally or technically kill briefings for all users at once with no fallback. Also a diligence red flag investors will probe."}, {"trigger": "Per-user LLM/embedding cost exceeds ~$5/user/month at 100-user scale.", "why_it_matters": "At a $10–20/month price, this compresses gross margin below 50%, undermining the investor narrative and forcing a pricing or architecture change."}, {"trigger": "Investor round requests imply >15–20% dilution at pre-seed, or pressure toward an uncapped/low-cap SAFE.", "why_it_matters": "Over-dilution at pre-seed compounds into every future round and leaves too little equity for a co-founder, seed, and option pool — an irreversible cap-table mistake."}, {"trigger": "Embedding/LLM provider deprecates a model or changes pricing.", "why_it_matters": "If the preference vector is tied to one model's vector space, deprecation forces re-embedding all historical user data — significant unplanned work at any scale."}, {"trigger": "Nightly pipeline wall-clock time approaches the overnight window as users grow.", "why_it_matters": "Sequential per-user scoring means briefings may not be ready by morning past a threshold, breaking the core product promise."}], "deprioritize_list": ["Investor outreach and fundraising before the milestone gate (non-founder DAUs + retention + a WTP signal) is met — raising now is premature and risks permanently burning warm angel/micro-VC relationships.", "Building deep B2B / team-level preference-vector aggregation — park it as a one-paragraph design placeholder so it isn't architected away, but do not pursue it before consumer PMF. Both the devils_advocate and the investor view it as an attention-budget distraction at this stage.", "Treating the morning-briefing format as a settled, defensible strategic choice — it remains an untested assumption to validate via retention, not to over-invest in or over-narrate.", "Spreading across multiple acquisition channels — pick exactly one channel to own first; multi-channel effort at zero users guarantees mediocrity everywhere.", "Heavy infrastructure (managed job queues, parallelization, build-vs-buy scraping decisions) beyond per-user isolation — defer until user count actually demands it."], "terrain_map_by_domain": {"marketer": "The undefined beachhead is the foundational gap blocking all GTM; it must be chosen this week by interview, not assumption. Target users are highly networked on the exact channels (ArXiv Twitter, r/MachineLearning) where the product also sources content, so one well-owned channel plus a delighted early cohort could drive nearly free organic distribution — raising the ROI on cold-start and onboarding quality.", "legal": "The scraping-based data pipeline (ArXiv, Reddit) and the redistribution of summarized third-party content carry ToS and copyright questions that should get a short attorney review before scaling. Because the preference vector is built from user reading behavior, a minimum-viable privacy policy, consent flow, and terms of service must be in place before the first external (especially EU/CA) user is onboarded.", "tech": "The pipeline has never been stress-tested beyond one user; before any onboarding it needs structured logging with zero-result alerts, per-user_id isolation of all data artifacts, and a one-page runbook to reduce solo-founder bus-factor risk. The two make-or-break technical levers are cold-start quality (a seed survey) and per-user compute cost caps — both are retention and survival issues, not polish.", "finance": "Unit economics are completely unknown and must be measured this week — cost-per-user-per-night is the number that sets gross margin, price floor, and round size. The path is: establish costs, set a pricing signal before free onboarding anchors WTP to zero, define a numeric milestone gate, then size a pre-seed (~$250K–$750K SAFE) with a protected cap table and a defensible valuation-cap floor."}, "advisor_disagreements": [{"topic": "Is the overnight morning-briefing format a defensible strategic choice or an untested assumption?", "investor_view": "Did not take a strong stance; treats it as part of the product to validate via retention rather than a settled differentiator.", "devils_advocate_view": "It is premature lock-in — the deck itself lists it as a key assumption, no external user has retained past day 3, and calling it a 'low-anxiety ritual' is retrofitting narrative onto an architectural default; under-testing it risks the most pivotal UX decision.", "innovator_view": "It is a considered hypothesis worth fast validation — a deliberate behavioral differentiation from real-time feeds — but agrees it must be tested, not assumed correct.", "resolution_question": "What is the cheapest experiment (e.g., offering a subset of users a real-time/Slack or weekly-digest variant) that would tell you within two weeks whether morning briefing is genuinely preferred, or just what you happened to build?"}, {"topic": "How much attention should the B2B / team-level preference vector expansion path get now?", "investor_view": "Not raised as a priority; focus is on consumer traction, unit economics, and pricing first.", "devils_advocate_view": "At zero external users with no validated consumer retention, surfacing an enterprise path is a distraction that misallocates a solo founder's scarce attention; it should be explicitly parked until consumer PMF.", "innovator_view": "It is a meaningful TAM-expanding option worth at least a design-document placeholder so it isn't accidentally architected away, without diluting the consumer wedge.", "resolution_question": "Can you preserve the B2B option with a single paragraph in your data schema notes, and otherwise commit to ignoring it until you hit your consumer milestone gate?"}], "open_questions_for_founder": ["Who specifically are the 'few interested users' (segment, how they found you), and are any located outside the US (GDPR/CCPA implications)?", "Is data collection done via official APIs (ArXiv OAI-PMH, Reddit API) or direct HTTP scraping — and has any legal counsel, ToS, or privacy policy ever been put in place?", "What exactly does a briefing contain (full abstracts, excerpts, paraphrases, or titles + links only), and where is user reading-behavior data stored (founder server, cloud, or on-device)?", "What is your current monthly API/compute spend running the prototype for yourself, and how long does one nightly run take end-to-end?", "Where does the pipeline run (local, single VM, managed), is there automated restart on failure, and is the preference vector tied to a specific embedding model's vector space?", "Have you talked to any interested user about paying, and what was their reaction?", "What is your personal financial runway — can you operate at $0 or minimal salary for 12–18 months?", "Do you have existing standing in ML/AI communities (Twitter following, GitHub presence, co-authors) or relationships with angels/pre-seed AI investors that could seed early distribution or a future raise?"], "how_constructed": "Seven advisors contributed: four domain specialists (marketing, legal, tech, finance) produced detailed reports, and three deciders (an investor, a devil's advocate, and an innovator) each reviewed the deck and specialist input, then reacted to one another. They converged strongly on a handful of points: lock a single beachhead segment this week by interview, measure and cap per-user compute cost immediately, solve cold-start before onboarding 10–15 real users to start the moat flywheel, and hold off on fundraising until a numeric traction-and-willingness-to-pay milestone is met. Disagreement was minimal — the only genuine pushbacks were the devil's advocate and innovator differing on whether the morning-briefing format is a defensible choice or an untested assumption, and on how much weight to give a future B2B expansion path. This brief merges the many overlapping recommendations into five ranked focus items, consolidates the risks and founder questions, and preserves the two real disagreements verbatim so you can judge them yourself."}};
+  </script>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+    const STAGE_NAMES = [
+      "Pitch deck",
+      "Specialists (parallel)",
+      "Deciders — round 1",
+      "Deciders — cross-exam",
+      "Synthesis",
+      "Final brief",
+    ];
+
+    function fmtRole(role) {
+      return String(role).replace(/_/g, " ");
+    }
+
+    function rowPositions(count, cx, y, spacing) {
+      if (count === 0) return [];
+      const total = spacing * (count - 1);
+      const start = cx - total / 2;
+      return Array.from({ length: count }, (_, i) => ({
+        x: start + i * spacing,
+        y,
+      }));
+    }
+
+    function polyPositions(count, cx, cy, radius) {
+      if (count === 0) return [];
+      if (count === 1) return [{ x: cx, y: cy }];
+      if (count === 2) {
+        return [
+          { x: cx - radius, y: cy },
+          { x: cx + radius, y: cy },
+        ];
+      }
+      return Array.from({ length: count }, (_, i) => {
+        const angle = -Math.PI / 2 + (i * 2 * Math.PI) / count;
+        return {
+          x: cx + radius * Math.cos(angle),
+          y: cy + radius * Math.sin(angle) * 0.55,
+        };
+      });
+    }
+
+    function edgePath(x1, y1, x2, y2, curve = 0.25) {
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2 - Math.abs(x2 - x1) * curve;
+      return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
+    }
+
+    function computeStats(session) {
+      const specialists = session.specialist_reports || [];
+      const deciders1 = session.decider_stage1 || [];
+      const brief = session.final_brief || {};
+      const specFindings = specialists.reduce(
+        (n, r) => n + (r.focus_items?.length || 0),
+        0
+      );
+      const decFindings = deciders1.reduce(
+        (n, d) => n + (d.key_findings?.length || 0),
+        0
+      );
+      return {
+        totalFindings: specFindings + decFindings,
+        agentCount: specialists.length + deciders1.length,
+        focusCount: brief.focus_list?.length || 0,
+        disagreeCount: brief.advisor_disagreements?.length || 0,
+      };
+    }
+
+    function buildGraph(session, w, h) {
+      const cx = w / 2;
+      const specRoles = (session.specialist_reports || []).map((r) => r.role);
+      const decRoles = (session.decider_stage1 || []).map((d) => d.role);
+      const spacing = Math.min(140, (w - 120) / Math.max(specRoles.length, 1));
+
+      const nodes = [];
+      const edges = [];
+
+      const pitch = { id: "pitch_deck", kind: "pitch", role: "pitch deck", x: cx, y: 70, r: 44 };
+      nodes.push(pitch);
+
+      const specPos = rowPositions(specRoles.length, cx, 200, spacing);
+      specRoles.forEach((role, i) => {
+        nodes.push({
+          id: `specialist:${role}`,
+          kind: "specialist",
+          role,
+          x: specPos[i].x,
+          y: specPos[i].y,
+          r: 38,
+        });
+        edges.push({
+          id: `e-pitch-${role}`,
+          kind: "fanout",
+          from: pitch.id,
+          to: `specialist:${role}`,
+          stage: 1,
+        });
+      });
+
+      const dec1Pos = rowPositions(decRoles.length, cx, 340, spacing);
+      decRoles.forEach((role, i) => {
+        nodes.push({
+          id: `decider1:${role}`,
+          kind: "decider1",
+          role,
+          x: dec1Pos[i].x,
+          y: dec1Pos[i].y,
+          r: 38,
+        });
+        specRoles.forEach((srole) => {
+          edges.push({
+            id: `e-spec-${srole}-d1-${role}`,
+            kind: "bundle",
+            from: `specialist:${srole}`,
+            to: `decider1:${role}`,
+            stage: 2,
+          });
+        });
+      });
+
+      const triR = Math.min(120, w * 0.14);
+      const dec2Pos = polyPositions(decRoles.length, cx, 500, triR);
+      decRoles.forEach((role, i) => {
+        nodes.push({
+          id: `decider2:${role}`,
+          kind: "decider2",
+          role,
+          x: dec2Pos[i].x,
+          y: dec2Pos[i].y,
+          r: 38,
+        });
+        edges.push({
+          id: `e-d1-d2-${role}`,
+          kind: "flow",
+          from: `decider1:${role}`,
+          to: `decider2:${role}`,
+          stage: 3,
+        });
+      });
+
+      const stage2Map = {};
+      (session.decider_stage2 || []).forEach((r) => {
+        stage2Map[r.role] = r;
+      });
+
+      decRoles.forEach((sourceRole) => {
+        const reaction = stage2Map[sourceRole];
+        if (!reaction) return;
+        (reaction.reacting_to || []).forEach((peerRole) => {
+          const hasPush = (reaction.pushbacks || []).length > 0;
+          const hasAgree = (reaction.agreements || []).length > 0;
+          let tone = "neutral";
+          if (hasPush) tone = "pushback";
+          else if (hasAgree) tone = "agreement";
+          edges.push({
+            id: `e-x-${sourceRole}-${peerRole}`,
+            kind: "cross",
+            from: `decider2:${sourceRole}`,
+            to: `decider2:${peerRole}`,
+            stage: 3,
+            tone,
+            agreements: reaction.agreements || [],
+            pushbacks: reaction.pushbacks || [],
+            sourceRole,
+            peerRole,
+          });
+        });
+      });
+
+      const synth = { id: "synthesis", kind: "synthesis", role: "synthesis", x: cx, y: 640, r: 44 };
+      nodes.push(synth);
+      decRoles.forEach((role) => {
+        edges.push({
+          id: `e-d2-synth-${role}`,
+          kind: "fanin",
+          from: `decider2:${role}`,
+          to: synth.id,
+          stage: 4,
+        });
+      });
+
+      const brief = { id: "final_brief", kind: "brief", role: "final brief", x: cx, y: 760, r: 44 };
+      nodes.push(brief);
+      edges.push({
+        id: "e-synth-brief",
+        kind: "flow",
+        from: synth.id,
+        to: brief.id,
+        stage: 5,
+      });
+
+      return { nodes, edges, specRoles, decRoles };
+    }
+
+    function useCountUp(target, active, duration = 1200) {
+      const [val, setVal] = useState(0);
+      const reduced = useRef(
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      );
+      useEffect(() => {
+        if (!active) {
+          setVal(0);
+          return;
+        }
+        if (reduced.current) {
+          setVal(target);
+          return;
+        }
+        const start = performance.now();
+        let frame;
+        const tick = (now) => {
+          const t = Math.min(1, (now - start) / duration);
+          setVal(Math.round(target * (1 - Math.pow(1 - t, 3))));
+          if (t < 1) frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+      }, [target, active, duration]);
+      return val;
+    }
+
+    function Panel({ selection, session }) {
+      if (!selection) {
+        return (
+          <div>
+            <h2>Advisor journey</h2>
+            <p className="subtitle">Click a node or decider edge to inspect real panel output.</p>
+            {session.final_brief?.how_constructed && (
+              <div className="panel-item">
+                <h3>How this brief was built</h3>
+                <p>{session.final_brief.how_constructed}</p>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      if (selection.type === "edge") {
+        const { edge } = selection;
+        return (
+          <div>
+            <h2>{fmtRole(edge.sourceRole)} → {fmtRole(edge.peerRole)}</h2>
+            <p className="subtitle">Stage-2 cross-examination</p>
+            {(edge.agreements || []).map((a, i) => (
+              <div key={`a-${i}`} className="panel-item agree">
+                <h3>Agreement</h3>
+                <p><strong>{a.point}</strong></p>
+                <p>{a.why}</p>
+              </div>
+            ))}
+            {(edge.pushbacks || []).length === 0 && (edge.agreements || []).length === 0 && (
+              <div className="panel-item"><p>No agreements or pushbacks recorded for this direction.</p></div>
+            )}
+            {(edge.pushbacks || []).map((p, i) => (
+              <div key={`p-${i}`} className="panel-item pushback">
+                <h3>Pushback</h3>
+                <p><strong>{p.point}</strong></p>
+                <p>{p.counter}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      const { node } = selection;
+      const role = node.role;
+
+      if (node.kind === "specialist") {
+        const report = (session.specialist_reports || []).find((r) => r.role === role);
+        return (
+          <div>
+            <h2>{fmtRole(role)}</h2>
+            <p className="subtitle">Specialist report — focus items</p>
+            {(report?.focus_items || []).map((item, i) => (
+              <div key={i} className="panel-item">
+                <h3>{item.title}</h3>
+                <p>{item.action}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (node.kind === "decider1" || node.kind === "decider2") {
+        const persp = (session.decider_stage1 || []).find((d) => d.role === role);
+        return (
+          <div>
+            <h2>{fmtRole(role)}</h2>
+            <p className="subtitle">Decider — key findings</p>
+            {(persp?.key_findings || []).map((f, i) => (
+              <div key={i} className="panel-item decider">
+                <h3>{f.finding}</h3>
+                <p style={{ fontSize: "0.8rem", marginTop: 6 }}>{f.citation}</p>
+                <div className="confidence">
+                  <span>{f.confidence}/10</span>
+                  <div className="confidence-bar">
+                    <div className="confidence-fill" style={{ width: `${f.confidence * 10}%` }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (node.kind === "synthesis" || node.kind === "brief") {
+        const brief = session.final_brief || {};
+        return (
+          <div>
+            <h2>{node.kind === "brief" ? "Final brief" : "Synthesis"}</h2>
+            <p className="subtitle">Consolidated focus list{node.kind === "brief" ? " + open questions" : ""}</p>
+            {(brief.focus_list || []).map((item, i) => (
+              <div key={i} className="panel-item">
+                <h3>{i + 1}. {item.title}</h3>
+                <p>{item.action}</p>
+                {item.rationale && <p style={{ marginTop: 8, fontSize: "0.82rem", color: "#94a3b8" }}>{item.rationale}</p>}
+              </div>
+            ))}
+            {node.kind === "brief" && (brief.open_questions_for_founder || []).map((q, i) => (
+              <div key={`q-${i}`} className="panel-item decider">
+                <h3>Open question</h3>
+                <p>{q}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      if (node.kind === "pitch") {
+        const deck = session.pitch_deck || {};
+        return (
+          <div>
+            <h2>Pitch deck</h2>
+            <p className="subtitle">Input to the panel</p>
+            {Object.entries(deck).map(([k, v]) => (
+              <div key={k} className="panel-item">
+                <h3>{k.replace(/_/g, " ")}</h3>
+                <p>{Array.isArray(v) ? v.join("; ") : v}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      return null;
+    }
+
+    function nodeColor(kind) {
+      if (kind === "specialist") return "var(--specialist)";
+      if (kind.startsWith("decider")) return "var(--decider)";
+      return "var(--structural)";
+    }
+
+    function App() {
+      const [session, setSession] = useState(SESSION);
+      const [stageIndex, setStageIndex] = useState(0);
+      const [playing, setPlaying] = useState(false);
+      const [selection, setSelection] = useState(null);
+      const [size, setSize] = useState({ w: 960, h: 820 });
+      const wrapRef = useRef(null);
+
+      useEffect(() => {
+        const ro = new ResizeObserver((entries) => {
+          const { width, height } = entries[0].contentRect;
+          setSize({ w: Math.max(600, width), h: Math.max(700, height) });
+        });
+        if (wrapRef.current) ro.observe(wrapRef.current);
+        return () => ro.disconnect();
+      }, []);
+
+      useEffect(() => {
+        if (!playing) return;
+        const id = setInterval(() => {
+          setStageIndex((s) => {
+            if (s >= STAGE_NAMES.length - 1) {
+              setPlaying(false);
+              return s;
+            }
+            return s + 1;
+          });
+        }, 1800);
+        return () => clearInterval(id);
+      }, [playing]);
+
+      const graph = useMemo(() => buildGraph(session, size.w, size.h), [session, size]);
+      const stats = useMemo(() => computeStats(session), [session]);
+      const showReadout = stageIndex >= STAGE_NAMES.length - 1;
+      const animFindings = useCountUp(stats.totalFindings, showReadout);
+      const animFocus = useCountUp(stats.focusCount, showReadout);
+      const animDisagree = useCountUp(stats.disagreeCount, showReadout);
+
+      const nodeVisible = (node) => {
+        if (node.kind === "pitch") return stageIndex >= 0;
+        if (node.kind === "specialist") return stageIndex >= 1;
+        if (node.kind === "decider1") return stageIndex >= 2;
+        if (node.kind === "decider2") return stageIndex >= 3;
+        if (node.kind === "synthesis") return stageIndex >= 4;
+        if (node.kind === "brief") return stageIndex >= 5;
+        return false;
+      };
+
+      const edgeVisible = (edge) => edge.stage <= stageIndex;
+
+      const edgeStroke = (edge) => {
+        if (edge.kind === "cross") {
+          if (edge.tone === "agreement") return "var(--agree)";
+          if (edge.tone === "pushback") return "var(--pushback)";
+          return "var(--edge)";
+        }
+        return "var(--edge)";
+      };
+
+      const loadFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            setSession(JSON.parse(ev.target.result));
+            setStageIndex(0);
+            setSelection(null);
+            setPlaying(false);
+          } catch {
+            alert("Invalid session JSON");
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      return (
+        <div className="app">
+          <header>
+            <div>
+              <h1>Multi-Agent Advisor Journey</h1>
+              <div className="session-id">session: {session.session_id || "—"}</div>
+            </div>
+            <div className="controls">
+              <button className="primary" onClick={() => { setStageIndex(0); setPlaying(true); }}>
+                ▶ Play
+              </button>
+              <button disabled={stageIndex <= 0} onClick={() => setStageIndex((s) => s - 1)}>◀</button>
+              <button disabled={stageIndex >= STAGE_NAMES.length - 1} onClick={() => setStageIndex((s) => s + 1)}>▶</button>
+              <button onClick={() => { setStageIndex(0); setPlaying(false); }}>↺ Replay</button>
+              <label className="file-btn">
+                Load session…
+                <input type="file" accept=".json,application/json" onChange={loadFile} />
+              </label>
+            </div>
+          </header>
+
+          <div className="readout">
+            Stage {stageIndex + 1}/{STAGE_NAMES.length}: <strong>{STAGE_NAMES[stageIndex]}</strong>
+            {showReadout && (
+              <span style={{ marginLeft: 16 }}>
+                {" "}
+                <strong>{animFindings}</strong> findings across <strong>{stats.agentCount}</strong> agents →{" "}
+                <strong>{animFocus}</strong> focus items, <strong>{animDisagree}</strong> disagreements kept
+              </span>
+            )}
+          </div>
+
+          <div className="graph-wrap" ref={wrapRef}>
+            <svg viewBox={`0 0 ${size.w} ${size.h}`} preserveAspectRatio="xMidYMid meet">
+              {graph.edges.filter(edgeVisible).map((edge) => {
+                const from = graph.nodes.find((n) => n.id === edge.from);
+                const to = graph.nodes.find((n) => n.id === edge.to);
+                if (!from || !to || !nodeVisible(from) || !nodeVisible(to)) return null;
+                const path = edgePath(from.x, from.y, to.x, to.y, edge.kind === "cross" ? 0.15 : 0.2);
+                const isCross = edge.kind === "cross";
+                return (
+                  <g key={edge.id}>
+                    <path
+                      d={path}
+                      fill="none"
+                      stroke={edgeStroke(edge)}
+                      strokeWidth={isCross ? 3 : 1.5}
+                      strokeOpacity={isCross ? 0.95 : 0.35}
+                      strokeDasharray={edge.kind === "bundle" ? "4 4" : undefined}
+                      style={{
+                        cursor: isCross ? "pointer" : "default",
+                        transition: reducedMotion ? "none" : "stroke-opacity 0.5s",
+                      }}
+                      onClick={() => isCross && setSelection({ type: "edge", edge })}
+                      onMouseEnter={() => isCross && setSelection({ type: "edge", edge })}
+                    />
+                    {isCross && (
+                      <path
+                        d={path}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={14}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => setSelection({ type: "edge", edge })}
+                        onMouseEnter={() => setSelection({ type: "edge", edge })}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+
+              {graph.nodes.map((node) => {
+                const vis = nodeVisible(node);
+                const opacity = vis ? 1 : 0;
+                const scale = vis ? 1 : 0.6;
+                return (
+                  <g
+                    key={node.id}
+                    transform={`translate(${node.x}, ${node.y}) scale(${scale})`}
+                    style={{
+                      opacity,
+                      transition: reducedMotion ? "none" : "opacity 0.55s ease, transform 0.55s ease",
+                      cursor: vis ? "pointer" : "default",
+                    }}
+                    onClick={() => vis && setSelection({ type: "node", node })}
+                    onMouseEnter={() => vis && setSelection({ type: "node", node })}
+                  >
+                    <circle
+                      r={node.r}
+                      fill={nodeColor(node.kind)}
+                      stroke="#f8fafc"
+                      strokeWidth={selection?.type === "node" && selection.node.id === node.id ? 3 : 1}
+                    />
+                    <text
+                      textAnchor="middle"
+                      dy="0.35em"
+                      fill="#fff"
+                      fontSize={node.r > 40 ? 11 : 10}
+                      fontWeight="700"
+                      style={{ pointerEvents: "none", textTransform: "capitalize" }}
+                    >
+                      {fmtRole(node.role).length > 14
+                        ? fmtRole(node.role).slice(0, 12) + "…"
+                        : fmtRole(node.role)}
+                    </text>
+                  </g>
+                );
+              })}
+
+              <text className="stage-label" x={size.w / 2} y={145}>Specialists</text>
+              <text className="stage-label" x={size.w / 2} y={285}>Deciders — round 1</text>
+              <text className="stage-label" x={size.w / 2} y={445}>Deciders — cross-exam</text>
+            </svg>
+
+            <div className="legend">
+              <div><span className="legend-dot" style={{ background: "var(--specialist)" }} /> Specialist</div>
+              <div><span className="legend-dot" style={{ background: "var(--decider)" }} /> Decider</div>
+              <div><span className="legend-dot" style={{ background: "var(--structural)" }} /> Pipeline</div>
+              <div><span className="legend-line" style={{ background: "var(--agree)" }} /> Agreement</div>
+              <div><span className="legend-line" style={{ background: "var(--pushback)" }} /> Pushback</div>
+            </div>
+          </div>
+
+          <aside className="side-panel">
+            <Panel selection={selection} session={session} />
+          </aside>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

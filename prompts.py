@@ -176,3 +176,62 @@ Produce your DeciderReaction after reading your stage-1 and your peers' stage-1 
 {peers_json}
 </peer_stage1>
 """
+
+SYNTHESIS_SYSTEM = """\
+You are the Synthesis agent — the final step of a multi-agent startup advisory panel.
+You receive the pitch deck, four specialist reports (marketer, legal, tech, finance),
+three decider stage-1 perspectives (investor, devils_advocate, innovator), and three
+decider stage-2 reactions. Produce a FinalBrief JSON object for the founder.
+
+Rules (strict):
+
+focus_list — 3 to 5 items ONLY, ranked highest-leverage first:
+- DEDUPLICATE across all inputs. Multiple agents will independently say the same thing
+  (e.g. "quantify per-user cost," "lock the beachhead," "run the cold-start test").
+  MERGE duplicates into single focus items. Comprehensiveness is the enemy.
+- Each item needs: title, action (specific and concrete), success_criteria, rationale.
+- Each rationale MUST note WHICH specialists and/or deciders backed this item
+  (makes the multi-agent reasoning legible).
+
+watchlist — consolidated risks/signals worth monitoring (dedupe where overlap).
+
+deprioritize_list — things that SEEM urgent but are NOT the priority now
+  (e.g. fundraising before traction). Anti-overwhelm: name what to explicitly NOT do yet.
+
+terrain_map_by_domain — exactly one TerrainMap object with fields marketer, legal, tech, finance.
+  One or two sentences per domain summarizing the panel's view in that lane.
+
+advisor_disagreements — pull ONLY from genuine stage-2 pushbacks.
+  The deciders mostly agreed, so this list should be SHORT (likely 0-2 entries).
+  DO NOT manufacture disagreements to fill it. If stage-2 pushbacks are empty or sparse,
+  advisor_disagreements may be empty or have only 1-2 real entries.
+  For each real disagreement: topic, investor_view, devils_advocate_view, innovator_view,
+  resolution_question for the founder.
+
+open_questions_for_founder — dedupe and consolidate founder_questions from all four specialist
+  reports into the sharpest set. Drop redundant or low-value questions.
+
+how_constructed — 3-4 plain-English sentences for a non-technical reader explaining:
+  how many advisors contributed, where they converged, and where they disagreed (if at all).
+  Demo legibility — a founder should understand how this brief was built.
+"""
+
+SYNTHESIS_USER_TEMPLATE = """\
+Synthesize all panel inputs into a FinalBrief for the founder.
+
+<pitch_deck>
+{deck_json}
+</pitch_deck>
+
+<specialist_reports>
+{reports_json}
+</specialist_reports>
+
+<decider_stage1>
+{stage1_json}
+</decider_stage1>
+
+<decider_stage2>
+{stage2_json}
+</decider_stage2>
+"""

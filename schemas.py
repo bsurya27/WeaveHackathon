@@ -70,6 +70,38 @@ class Missed(BaseModel):
     why_it_matters: str
 
 
+class FocusListItem(BaseModel):
+    title: str
+    action: str
+    success_criteria: str
+    rationale: str
+
+
+class WatchlistItem(BaseModel):
+    trigger: str
+    why_it_matters: str
+
+
+class TerrainMap(BaseModel):
+    marketer: str
+    legal: str
+    tech: str
+    finance: str
+
+
+class Disagreement(BaseModel):
+    topic: str
+    investor_view: str
+    devils_advocate_view: str
+    innovator_view: str
+    resolution_question: str
+
+
 class FinalBrief(BaseModel):
-    recommendation: str
-    summary: str
+    focus_list: list[FocusListItem]
+    watchlist: list[WatchlistItem]
+    deprioritize_list: list[str]
+    terrain_map_by_domain: TerrainMap
+    advisor_disagreements: list[Disagreement]
+    open_questions_for_founder: list[str]
+    how_constructed: str
