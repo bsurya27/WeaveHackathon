@@ -13,6 +13,42 @@ class PitchDeck(BaseModel):
     current_ask: str
 
 
+def empty_pitch_deck() -> PitchDeck:
+    return PitchDeck(
+        problem="",
+        customer="",
+        solution="",
+        wedge="",
+        current_stage="",
+        founder_background="",
+        traction="",
+        key_assumptions=[],
+        current_ask="",
+    )
+
+
+class IntakeUpdates(BaseModel):
+    problem: str | None = None
+    customer: str | None = None
+    solution: str | None = None
+    wedge: str | None = None
+    current_stage: str | None = None
+    founder_background: str | None = None
+    traction: str | None = None
+    key_assumptions: list[str] | None = None
+    current_ask: str | None = None
+
+
+class IntakeTurn(BaseModel):
+    updates: IntakeUpdates
+    next_question: str | None = None
+    done: bool = False
+
+
+class FollowupReply(BaseModel):
+    reply: str
+
+
 class FocusItem(BaseModel):
     title: str
     why_now: str

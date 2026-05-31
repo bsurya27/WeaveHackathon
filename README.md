@@ -17,7 +17,17 @@ pip install -r requirements.txt
 wandb login
 ```
 
-## Run
+## Streamlit UI (intake + panel + follow-up)
+
+```powershell
+.\weavehack\Scripts\Activate.ps1
+pip install streamlit
+streamlit run streamlit_app.py
+```
+
+Opens at http://localhost:8501 — conversational intake, run panel, then follow-up Q&A.
+
+## CLI pipeline (dummy deck)
 
 ```powershell
 .\weavehack\Scripts\Activate.ps1

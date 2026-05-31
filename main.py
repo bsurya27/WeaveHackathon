@@ -1,3 +1,7 @@
+from env_loader import load_dotenv
+
+load_dotenv()
+
 import asyncio
 
 import weave
@@ -9,6 +13,14 @@ from session import save_session
 
 
 async def main() -> None:
+    import os
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise SystemExit(
+            "ANTHROPIC_API_KEY is not set. Add it to .env in the project root "
+            "or export it in your shell before running."
+        )
+
     weave.init(config.WEAVE_PROJECT)
 
     output = await run(DUMMY_PITCH_DECK)
